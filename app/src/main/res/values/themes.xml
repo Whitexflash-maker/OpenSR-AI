@@ -1,5 +1,8 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
-    <!-- Framework theme: no extra dependency needed; Compose draws the UI. -->
-    <style name="Theme.OpenSR" parent="android:Theme.Material.Light.NoActionBar" />
+    <!-- Framework dark theme (no extra dependency). Compose draws the real UI; the window
+         background only avoids a white flash while the app starts. -->
+    <style name="Theme.FeatherX" parent="android:Theme.Material.NoActionBar">
+        <item name="android:windowBackground">@color/fx_black</item>
+    </style>
 </resources>

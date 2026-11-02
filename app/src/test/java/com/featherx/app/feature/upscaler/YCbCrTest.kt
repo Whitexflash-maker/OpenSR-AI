@@ -1,4 +1,4 @@
-package com.opensr.ai
+package com.featherx.app.feature.upscaler
 
 import org.junit.Assert.assertEquals
 import org.junit.Assert.assertTrue

@@ -1,4 +1,4 @@
-package com.opensr.ai
+package com.featherx.app.feature.upscaler
 
 import ai.onnxruntime.OnnxTensor
 import ai.onnxruntime.OrtEnvironment
@@ -6,10 +6,10 @@ import ai.onnxruntime.OrtSession
 import ai.onnxruntime.TensorInfo
 import android.content.Context
 import android.graphics.Bitmap
-import com.opensr.ai.TilePlanner.MARGIN
-import com.opensr.ai.TilePlanner.OUT_TILE
-import com.opensr.ai.TilePlanner.SCALE
-import com.opensr.ai.TilePlanner.TILE
+import com.featherx.app.feature.upscaler.TilePlanner.MARGIN
+import com.featherx.app.feature.upscaler.TilePlanner.OUT_TILE
+import com.featherx.app.feature.upscaler.TilePlanner.SCALE
+import com.featherx.app.feature.upscaler.TilePlanner.TILE
 import java.nio.ByteBuffer
 import java.nio.ByteOrder
 import java.nio.FloatBuffer

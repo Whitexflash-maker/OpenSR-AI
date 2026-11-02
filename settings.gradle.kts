@@ -14,5 +14,5 @@ dependencyResolutionManagement {
     }
 }
 
-rootProject.name = "OpenSR-AI"
+rootProject.name = "FeatherX"
 include(":app")

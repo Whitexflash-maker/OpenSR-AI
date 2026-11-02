@@ -5,13 +5,12 @@
         android:allowBackup="false"
         android:label="@string/app_name"
         android:largeHeap="true"
-        android:theme="@style/Theme.OpenSR">
+        android:theme="@style/Theme.FeatherX">
 
-        <!-- configChanges: keep state (picked image, result) when the phone rotates. -->
+        <!-- No configChanges: state lives in ViewModels so rotation is handled properly. -->
         <activity
             android:name=".MainActivity"
-            android:exported="true"
-            android:configChanges="orientation|screenSize|screenLayout|smallestScreenSize|keyboardHidden|uiMode">
+            android:exported="true">
             <intent-filter>
                 <action android:name="android.intent.action.MAIN" />
                 <category android:name="android.intent.category.LAUNCHER" />

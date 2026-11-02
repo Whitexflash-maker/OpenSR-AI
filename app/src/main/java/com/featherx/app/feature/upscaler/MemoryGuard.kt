@@ -1,4 +1,4 @@
-package com.opensr.ai
+package com.featherx.app.feature.upscaler
 
 import android.app.ActivityManager
 import android.content.Context
