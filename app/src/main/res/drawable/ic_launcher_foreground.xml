@@ -1,0 +1,19 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- FeatherX mark: an "X" made of two strokes (soft blue + electric blue), kept inside the
+     66dp adaptive-icon safe zone of the 108dp canvas. -->
+<vector xmlns:android="http://schemas.android.com/apk/res/android"
+    android:width="108dp"
+    android:height="108dp"
+    android:viewportWidth="108"
+    android:viewportHeight="108">
+    <path
+        android:pathData="M72,36 L36,72"
+        android:strokeColor="#FF7FB0FF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+    <path
+        android:pathData="M36,36 L72,72"
+        android:strokeColor="#FF2D7CFF"
+        android:strokeWidth="9"
+        android:strokeLineCap="round" />
+</vector>

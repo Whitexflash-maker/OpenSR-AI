@@ -62,7 +62,9 @@ fun InfoRow(name: String, value: String, valueColor: Color = MaterialTheme.color
     ) {
         Text(
             text = name,
-            modifier = Modifier.padding(end = 12.dp),
+            modifier = Modifier
+                .weight(1f)
+                .padding(end = 12.dp),
             style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )

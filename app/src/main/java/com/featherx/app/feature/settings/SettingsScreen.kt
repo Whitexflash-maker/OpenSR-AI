@@ -39,7 +39,7 @@ fun SettingsScreen() {
                 )
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Licence (original code)", "Apache-2.0")
-                InfoRow("Device", "${Build.MANUFACTURER} ${Build.MODEL}")
+                InfoRow("Device", deviceName(Build.MANUFACTURER, Build.MODEL))
                 InfoRow("Android", "${Build.VERSION.RELEASE} (API ${Build.VERSION.SDK_INT})")
             }
         }

@@ -1,4 +1,5 @@
 <?xml version="1.0" encoding="utf-8"?>
 <resources>
     <color name="fx_black">#FF05070D</color>
+    <color name="fx_icon_background">#FF0A1020</color>
 </resources>

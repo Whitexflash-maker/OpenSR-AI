@@ -62,10 +62,10 @@ fun HomeScreen(upscaler: UpscalerViewModel) {
                     ModelState.Failed -> "Model failed to load" to FxColors.Danger
                 }
                 InfoRow("AI Image Upscaler", modelText, modelColor)
-                InfoRow("Game Space", "Not built yet (Step 5)", FxColors.Warn)
-                InfoRow("Performance modes", "Not built yet (Step 6)", FxColors.Warn)
-                InfoRow("Device monitor", "Not built yet (Step 7)", FxColors.Warn)
-                InfoRow("Thermal & memory protection", "Not built yet (Step 8)", FxColors.Warn)
+                InfoRow("Game Space", "Basic version (Step 5)", FxColors.BlueSoft)
+                InfoRow("Performance modes", "Not built (Step 6)", FxColors.Warn)
+                InfoRow("Device monitor", "Not built (Step 7)", FxColors.Warn)
+                InfoRow("Thermal & memory safety", "Not built (Step 8)", FxColors.Warn)
             }
         }
 

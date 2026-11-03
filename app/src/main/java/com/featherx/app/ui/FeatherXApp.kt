@@ -24,6 +24,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.graphics.vector.ImageVector
 import androidx.compose.ui.text.style.TextOverflow
 import com.featherx.app.feature.gamespace.GameSpaceScreen
+import com.featherx.app.feature.gamespace.GameSpaceViewModel
 import com.featherx.app.feature.home.HomeScreen
 import com.featherx.app.feature.performance.PerformanceScreen
 import com.featherx.app.feature.settings.SettingsScreen
@@ -40,7 +41,7 @@ private enum class Destination(val label: String, val icon: ImageVector) {
 }
 
 @Composable
-fun FeatherXApp(upscaler: UpscalerViewModel) {
+fun FeatherXApp(upscaler: UpscalerViewModel, gameSpace: GameSpaceViewModel) {
     // The selected tab survives rotation and process recreation (saved as a plain Int).
     var selected by rememberSaveable { mutableStateOf(0) }
     val destinations = Destination.entries
@@ -79,7 +80,7 @@ fun FeatherXApp(upscaler: UpscalerViewModel) {
         Box(Modifier.padding(innerPadding)) {
             when (current) {
                 Destination.Home -> HomeScreen(upscaler)
-                Destination.GameSpace -> GameSpaceScreen()
+                Destination.GameSpace -> GameSpaceScreen(gameSpace)
                 Destination.Performance -> PerformanceScreen()
                 Destination.Upscaler -> UpscalerScreen(upscaler)
                 Destination.Settings -> SettingsScreen()

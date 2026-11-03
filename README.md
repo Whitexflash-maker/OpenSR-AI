@@ -12,7 +12,7 @@ FeatherX is an open-source Android app (Kotlin + Jetpack Compose) that is being 
 |---|---|
 | App shell (dark theme, 5 tabs, edge-to-edge) | Built in CI; not yet confirmed on a phone |
 | AI Image Upscaler (x3, ONNX Runtime, CPU, tiled) | Confirmed on a phone before the shell refactor (model loaded, 640x640 to 1920x1920 in 2.86 s, one run). Re-check needed after the refactor |
-| Game Space | Not built (Step 5) |
+| Game Space (library, add/remove, launch, recents) | Built in CI (Step 5); not yet confirmed on a phone. Per-game profiles come with Step 6 |
 | Performance modes LOW / MEDIUM / HIGH / ULTRA / AUTO | Not built (Step 6) |
 | Device monitor | Not built (Step 7) |
 | Thermal and memory protection | Not built (Step 8) |
