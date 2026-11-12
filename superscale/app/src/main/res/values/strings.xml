@@ -1,0 +1,13 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <string name="app_name">SuperScale</string>
+    <string name="mode_smart">Smart Upscale</string>
+    <string name="mode_bilinear">Bilinear</string>
+    <string name="label_sharpness">শার্পনেস</string>
+    <string name="label_resolution">রেন্ডার রেজোলিউশন</string>
+    <string name="btn_upscale">ছবি আপস্কেল</string>
+    <string name="btn_save">সেভ</string>
+    <string name="saved_to">সেভ হয়েছে: Pictures/SuperScale</string>
+    <string name="processing">প্রসেস হচ্ছে…</string>
+    <string name="pick_image">একটি ছবি বেছে নিন</string>
+</resources>
