@@ -6,7 +6,7 @@ on:
   workflow_dispatch:
 
 permissions:
-  contents: read
+  contents: write
 
 concurrency:
   group: build-debug-apk
@@ -53,6 +53,19 @@ jobs:
 
       - name: Run unit tests
         run: gradle :app:testDebugUnitTest --stacktrace --no-daemon
+
+      - name: Publish APK as a GitHub Release (direct .apk download, no zip, no expiry)
+        env:
+          GH_TOKEN: ${{ github.token }}
+        run: |
+          cp app/build/outputs/apk/debug/app-debug.apk FeatherX-debug.apk
+          sha256sum FeatherX-debug.apk | tee FeatherX-debug.apk.sha256
+          ls -l FeatherX-debug.apk
+          gh release delete latest-debug --cleanup-tag --yes || true
+          gh release create latest-debug FeatherX-debug.apk FeatherX-debug.apk.sha256 \
+            --prerelease --target "$GITHUB_SHA" \
+            --title "FeatherX latest debug build" \
+            --notes "Debug build from commit $GITHUB_SHA. Debug APK, not a final release. Uninstall the old FeatherX before installing."
 
       - name: Upload reports (only on failure)
         if: failure()
