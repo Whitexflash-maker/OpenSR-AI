@@ -21,7 +21,7 @@ class GameSpaceViewModel(application: Application) : AndroidViewModel(applicatio
     private val repository = GameRepository(application)
     private val scope = CoroutineScope(SupervisorJob() + Dispatchers.Main.immediate)
 
-    // At most 64 small icons (about 36 KB each) are kept in memory.
+    // At most 32 icons (about 150 KB each) are kept in memory.
     private val iconCache = LruCache<String, ImageBitmap>(MAX_CACHED_ICONS)
 
     private var prefs = LibraryPrefs()
@@ -106,7 +106,7 @@ class GameSpaceViewModel(application: Application) : AndroidViewModel(applicatio
     }
 
     private companion object {
-        const val MAX_CACHED_ICONS = 64
-        const val ICON_SIZE_PX = 96
+        const val MAX_CACHED_ICONS = 32
+        const val ICON_SIZE_PX = 192
     }
 }
