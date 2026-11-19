@@ -6,7 +6,7 @@ import androidx.compose.material.icons.Icons
 import androidx.compose.material.icons.filled.Build
 import androidx.compose.material.icons.filled.Home
 import androidx.compose.material.icons.filled.PlayArrow
-import androidx.compose.material.icons.filled.Search
+import androidx.compose.material.icons.filled.Star
 import androidx.compose.material.icons.filled.Settings
 import androidx.compose.material3.Icon
 import androidx.compose.material3.MaterialTheme
@@ -27,21 +27,21 @@ import com.featherx.app.feature.gamespace.GameSpaceScreen
 import com.featherx.app.feature.gamespace.GameSpaceViewModel
 import com.featherx.app.feature.home.HomeScreen
 import com.featherx.app.feature.performance.PerformanceScreen
+import com.featherx.app.feature.protools.ProToolsScreen
+import com.featherx.app.feature.protools.ProToolsViewModel
 import com.featherx.app.feature.settings.SettingsScreen
-import com.featherx.app.feature.upscaler.UpscalerScreen
-import com.featherx.app.feature.upscaler.UpscalerViewModel
 import com.featherx.app.ui.theme.FxColors
 
 private enum class Destination(val label: String, val icon: ImageVector) {
     Home("Home", Icons.Filled.Home),
     GameSpace("Game Space", Icons.Filled.PlayArrow),
     Performance("Performance", Icons.Filled.Build),
-    Upscaler("AI Upscaler", Icons.Filled.Search),
+    ProTools("Pro Tools", Icons.Filled.Star),
     Settings("Settings", Icons.Filled.Settings),
 }
 
 @Composable
-fun FeatherXApp(upscaler: UpscalerViewModel, gameSpace: GameSpaceViewModel) {
+fun FeatherXApp(proTools: ProToolsViewModel, gameSpace: GameSpaceViewModel) {
     // The selected tab survives rotation and process recreation (saved as a plain Int).
     var selected by rememberSaveable { mutableStateOf(0) }
     val destinations = Destination.entries
@@ -79,10 +79,10 @@ fun FeatherXApp(upscaler: UpscalerViewModel, gameSpace: GameSpaceViewModel) {
         // innerPadding already contains the status-bar and navigation-bar insets (Android 15 edge-to-edge).
         Box(Modifier.padding(innerPadding)) {
             when (current) {
-                Destination.Home -> HomeScreen(upscaler)
+                Destination.Home -> HomeScreen()
                 Destination.GameSpace -> GameSpaceScreen(gameSpace)
                 Destination.Performance -> PerformanceScreen()
-                Destination.Upscaler -> UpscalerScreen(upscaler)
+                Destination.ProTools -> ProToolsScreen(proTools)
                 Destination.Settings -> SettingsScreen()
             }
         }

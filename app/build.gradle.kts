@@ -4,24 +4,16 @@ plugins {
     id("org.jetbrains.kotlin.plugin.compose")
 }
 
-// Single place to change the ONNX Runtime version.
-val ortVersion = "1.27.0"
-
 android {
     namespace = "com.featherx.app"
     compileSdk = 35
 
     defaultConfig {
         applicationId = "com.featherx.app"
-        minSdk = 28          // ImageDecoder needs API 28
+        minSdk = 28
         targetSdk = 35
-        versionCode = 2
-        versionName = "0.2.0-dev"
-
-        // Keep the APK small: only ARM ABIs (virtually all phones).
-        ndk {
-            abiFilters += listOf("arm64-v8a", "armeabi-v7a")
-        }
+        versionCode = 3
+        versionName = "0.3.0-dev"
     }
 
     compileOptions {
@@ -52,8 +44,6 @@ dependencies {
     implementation("androidx.compose.material3:material3")
     implementation("androidx.compose.material:material-icons-core")
     implementation("androidx.activity:activity-compose:1.10.1")
-
-    implementation("com.microsoft.onnxruntime:onnxruntime-android:$ortVersion")
 
     testImplementation("junit:junit:4.13.2")
 }

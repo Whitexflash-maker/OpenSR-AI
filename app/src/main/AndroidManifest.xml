@@ -4,6 +4,15 @@
     <!-- Android 11+ hides other apps by default. This declares exactly one thing FeatherX needs:
          to see apps that have a launcher icon (for the Game Space library and for launching them).
          It does NOT use the broad QUERY_ALL_PACKAGES permission. -->
+    <!-- Pro Tools sidebar. SYSTEM_ALERT_WINDOW = "Display over other apps" (user switches it on in Settings).
+         The foreground service keeps the overlay alive while a game is in front.
+         INTERNET is used only for the ping measurement (a TCP connection to 1.1.1.1:443) while the panel is open. -->
+    <uses-permission android:name="android.permission.SYSTEM_ALERT_WINDOW" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
+    <uses-permission android:name="android.permission.FOREGROUND_SERVICE_SPECIAL_USE" />
+    <uses-permission android:name="android.permission.POST_NOTIFICATIONS" />
+    <uses-permission android:name="android.permission.INTERNET" />
+
     <queries>
         <intent>
             <action android:name="android.intent.action.MAIN" />
@@ -16,7 +25,6 @@
         android:icon="@mipmap/ic_launcher"
         android:roundIcon="@mipmap/ic_launcher_round"
         android:label="@string/app_name"
-        android:largeHeap="true"
         android:theme="@style/Theme.FeatherX">
 
         <!-- No configChanges: state lives in ViewModels so rotation is handled properly. -->
@@ -28,6 +36,15 @@
                 <category android:name="android.intent.category.LAUNCHER" />
             </intent-filter>
         </activity>
+
+        <service
+            android:name=".feature.protools.OverlayService"
+            android:exported="false"
+            android:foregroundServiceType="specialUse">
+            <property
+                android:name="android.app.PROPERTY_SPECIAL_USE_FGS_SUBTYPE"
+                android:value="Floating sidebar drawn over games: crosshair, screen filter and live device stats" />
+        </service>
     </application>
 
 </manifest>

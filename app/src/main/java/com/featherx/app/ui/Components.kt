@@ -1,6 +1,13 @@
 package com.featherx.app.ui
 
 import androidx.compose.foundation.BorderStroke
+import androidx.compose.foundation.background
+import androidx.compose.foundation.border
+import androidx.compose.foundation.clickable
+import androidx.compose.foundation.layout.Box
+import androidx.compose.foundation.layout.size
+import androidx.compose.foundation.shape.CircleShape
+import androidx.compose.ui.draw.clip
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
@@ -75,4 +82,37 @@ fun InfoRow(name: String, value: String, valueColor: Color = MaterialTheme.color
             textAlign = TextAlign.End,
         )
     }
+}
+
+/** Small selectable pill (used for modes and styles, in the app and in the overlay). */
+@Composable
+fun FxChip(text: String, selected: Boolean, onClick: () -> Unit) {
+    val shape = RoundedCornerShape(10.dp)
+    Box(
+        modifier = Modifier
+            .clip(shape)
+            .background(if (selected) FxColors.Blue else FxColors.Navy)
+            .border(1.dp, if (selected) FxColors.Blue else MaterialTheme.colorScheme.outline, shape)
+            .clickable(onClick = onClick)
+            .padding(horizontal = 12.dp, vertical = 7.dp),
+    ) {
+        Text(
+            text = text,
+            style = MaterialTheme.typography.labelMedium,
+            color = if (selected) Color.White else FxColors.Muted,
+        )
+    }
+}
+
+/** Round colour swatch; a white ring marks the selected one. */
+@Composable
+fun FxSwatch(color: Color, label: String, selected: Boolean, onClick: () -> Unit) {
+    Box(
+        modifier = Modifier
+            .size(30.dp)
+            .clip(CircleShape)
+            .background(color)
+            .border(if (selected) 3.dp else 1.dp, if (selected) Color.White else FxColors.Muted, CircleShape)
+            .clickable(onClick = onClick),
+    )
 }

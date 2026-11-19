@@ -17,14 +17,12 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.featherx.app.BuildConfig
-import com.featherx.app.feature.upscaler.ModelState
-import com.featherx.app.feature.upscaler.UpscalerViewModel
 import com.featherx.app.ui.FxCard
 import com.featherx.app.ui.InfoRow
 import com.featherx.app.ui.theme.FxColors
 
 @Composable
-fun HomeScreen(upscaler: UpscalerViewModel) {
+fun HomeScreen() {
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -56,12 +54,7 @@ fun HomeScreen(upscaler: UpscalerViewModel) {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                val (modelText, modelColor) = when (upscaler.modelState) {
-                    ModelState.Ready -> "Model loaded" to FxColors.Ok
-                    ModelState.Loading -> "Loading model…" to FxColors.Muted
-                    ModelState.Failed -> "Model failed to load" to FxColors.Danger
-                }
-                InfoRow("AI Image Upscaler", modelText, modelColor)
+                InfoRow("Pro Tools overlay (Step 5b)", "Built, needs testing on phone", FxColors.BlueSoft)
                 InfoRow("Game Space", "Basic version (Step 5)", FxColors.BlueSoft)
                 InfoRow("Performance modes", "Not built (Step 6)", FxColors.Warn)
                 InfoRow("Device monitor", "Not built (Step 7)", FxColors.Warn)

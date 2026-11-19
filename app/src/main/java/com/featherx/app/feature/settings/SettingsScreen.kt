@@ -51,15 +51,7 @@ fun SettingsScreen() {
                     style = MaterialTheme.typography.titleMedium,
                     fontWeight = FontWeight.SemiBold,
                 )
-                InfoRow("ONNX Runtime (Android)", "MIT")
-                InfoRow("Model: super-resolution-10", "Apache-2.0")
                 InfoRow("AndroidX / Jetpack Compose", "Apache-2.0")
-                Text(
-                    text = "The model is the Sub-Pixel CNN from the ONNX Model Zoo " +
-                        "(Shi et al., 2016, arXiv:1609.05158).",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
     }

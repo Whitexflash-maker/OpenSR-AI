@@ -8,14 +8,14 @@ import androidx.activity.compose.setContent
 import androidx.activity.enableEdgeToEdge
 import androidx.activity.viewModels
 import com.featherx.app.feature.gamespace.GameSpaceViewModel
-import com.featherx.app.feature.upscaler.UpscalerViewModel
+import com.featherx.app.feature.protools.ProToolsViewModel
 import com.featherx.app.ui.FeatherXApp
 import com.featherx.app.ui.theme.FeatherXTheme
 
 class MainActivity : ComponentActivity() {
 
     // Owned by the Activity's ViewModelStore: survives rotation and tab switches.
-    private val upscalerViewModel: UpscalerViewModel by viewModels()
+    private val proToolsViewModel: ProToolsViewModel by viewModels()
     private val gameSpaceViewModel: GameSpaceViewModel by viewModels()
 
     override fun onCreate(savedInstanceState: Bundle?) {
@@ -26,7 +26,7 @@ class MainActivity : ComponentActivity() {
         )
         setContent {
             FeatherXTheme {
-                FeatherXApp(upscalerViewModel, gameSpaceViewModel)
+                FeatherXApp(proToolsViewModel, gameSpaceViewModel)
             }
         }
     }

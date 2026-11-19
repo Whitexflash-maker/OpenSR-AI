@@ -20,12 +20,6 @@ jobs:
       - name: Check out repository
         uses: actions/checkout@v4
 
-      - name: Verify model asset (size and SHA-256)
-        run: |
-          ls -l app/src/main/assets/
-          test "$(stat -c %s app/src/main/assets/super-resolution-10.onnx)" = "240078"
-          echo "85f36ff88cc504a24af5e0602148bc56a8aa09a58eca8c0da2756f3e8186035e  app/src/main/assets/super-resolution-10.onnx" | sha256sum -c -
-
       - name: Set up JDK 17
         uses: actions/setup-java@v4
         with:
