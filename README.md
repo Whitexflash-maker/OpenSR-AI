@@ -2,7 +2,7 @@
 
 **Lightweight. Intelligent. Powerful.**
 
-FeatherX is an open-source Android app (Kotlin + Jetpack Compose) that is being built in small, tested steps for low-memory phones (first target: 4 GB RAM). It will grow into a gaming dashboard, performance profiles, a real device monitor and on-device AI image upscaling.
+FeatherX is an open-source Android app (Kotlin + Jetpack Compose) that is being built in small, tested steps for low-memory phones (first target: 4 GB RAM). It will grow into a gaming dashboard, performance profiles, a real device monitor.
 
 **Status: v0.3.0-dev, early work in progress.** Only parts confirmed on a real phone are called "working". Everything else is either marked "built in CI, not yet confirmed" or "not built", and the app says so on screen instead of pretending.
 
