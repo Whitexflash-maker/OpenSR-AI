@@ -37,7 +37,7 @@ import kotlinx.coroutines.launch
  *  1. sidebar (handle + panel), touchable, tiny when closed
  *  2. crosshair, centred, NOT touchable (touches pass through to the game)
  *  3. screen filter, full screen, NOT touchable
- * Windows 2 and 3 exist only while their switch is on.
+ * Windows 2 and 3 are created first (so the sidebar stays on top) and are hidden while their switch is off.
  */
 class OverlayService : Service() {
 
@@ -68,6 +68,11 @@ class OverlayService : Service() {
         }
         try {
             owner.start()
+            // Window order = order of adding (later = on top). Crosshair and filter windows are created
+            // FIRST and only shown/hidden afterwards, so the sidebar is always the top-most window and
+            // the crosshair can never be drawn over the panel.
+            addCrosshairWindow()
+            addFilterWindow()
             addSidebar()
             started = true
             OverlayController.setRunning(true)
@@ -160,59 +165,63 @@ class OverlayService : Service() {
         }
     }
 
-    private fun applyCrosshair(s: OverlaySettings) {
-        if (!s.crosshairOn) {
-            removeSafely(crosshairView)
-            crosshairView = null
-            return
+    private fun addCrosshairWindow() {
+        val s = OverlayController.settings.value
+        val sizePx = crosshairPx(s)
+        val view = CrosshairView(this).apply {
+            crosshairStyle = s.crosshairStyle
+            argb = s.crosshairColor.argb
+            visibility = if (s.crosshairOn) View.VISIBLE else View.GONE
         }
-        val sizePx = (s.crosshairSizeDp * resources.displayMetrics.density).toInt()
-        val existing = crosshairView
-        if (existing == null) {
-            val view = CrosshairView(this).apply {
-                crosshairStyle = s.crosshairStyle
-                argb = s.crosshairColor.argb
-            }
-            val params = baseParams(sizePx, sizePx, passThroughFlags).apply {
-                gravity = Gravity.CENTER
-                alpha = MAX_UNTRUSTED_ALPHA
-                applyCutoutMode(this)
-            }
-            if (tryAdd(view, params)) crosshairView = view
-        } else {
-            existing.crosshairStyle = s.crosshairStyle
-            existing.argb = s.crosshairColor.argb
-            val params = existing.layoutParams as? WindowManager.LayoutParams ?: return
-            if (params.width != sizePx) {
-                params.width = sizePx
-                params.height = sizePx
-                try { wm.updateViewLayout(existing, params) } catch (e: IllegalArgumentException) { }
-            }
+        // Its own window, centred on the screen, never takes focus or touches.
+        val params = baseParams(sizePx, sizePx, passThroughFlags).apply {
+            gravity = Gravity.CENTER
+            alpha = MAX_UNTRUSTED_ALPHA
+            applyCutoutMode(this)
+        }
+        wm.addView(view, params)
+        crosshairView = view
+    }
+
+    private fun addFilterWindow() {
+        val s = OverlayController.settings.value
+        val view = View(this).apply {
+            setBackgroundColor(s.filterArgb())
+            visibility = if (s.filterOn) View.VISIBLE else View.GONE
+        }
+        val params = baseParams(
+            WindowManager.LayoutParams.MATCH_PARENT,
+            WindowManager.LayoutParams.MATCH_PARENT,
+            passThroughFlags,
+        ).apply {
+            gravity = Gravity.TOP or Gravity.START
+            alpha = MAX_UNTRUSTED_ALPHA
+            applyCutoutMode(this)
+        }
+        wm.addView(view, params)
+        filterView = view
+    }
+
+    private fun crosshairPx(s: OverlaySettings) = (s.crosshairSizeDp * resources.displayMetrics.density).toInt()
+
+    private fun applyCrosshair(s: OverlaySettings) {
+        val view = crosshairView ?: return
+        view.crosshairStyle = s.crosshairStyle
+        view.argb = s.crosshairColor.argb
+        view.visibility = if (s.crosshairOn) View.VISIBLE else View.GONE
+        val params = view.layoutParams as? WindowManager.LayoutParams ?: return
+        val sizePx = crosshairPx(s)
+        if (params.width != sizePx) {
+            params.width = sizePx
+            params.height = sizePx
+            try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
         }
     }
 
     private fun applyFilter(s: OverlaySettings) {
-        if (!s.filterOn) {
-            removeSafely(filterView)
-            filterView = null
-            return
-        }
-        val existing = filterView
-        if (existing == null) {
-            val view = View(this).apply { setBackgroundColor(s.filterArgb()) }
-            val params = baseParams(
-                WindowManager.LayoutParams.MATCH_PARENT,
-                WindowManager.LayoutParams.MATCH_PARENT,
-                passThroughFlags,
-            ).apply {
-                gravity = Gravity.TOP or Gravity.START
-                alpha = MAX_UNTRUSTED_ALPHA
-                applyCutoutMode(this)
-            }
-            if (tryAdd(view, params)) filterView = view
-        } else {
-            existing.setBackgroundColor(s.filterArgb())
-        }
+        val view = filterView ?: return
+        view.setBackgroundColor(s.filterArgb())
+        view.visibility = if (s.filterOn) View.VISIBLE else View.GONE
     }
 
     /** Draw under the camera cut-out too, so the filter covers the whole screen. */
@@ -220,13 +229,6 @@ class OverlayService : Service() {
         params.layoutInDisplayCutoutMode =
             if (Build.VERSION.SDK_INT >= 30) WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_ALWAYS
             else WindowManager.LayoutParams.LAYOUT_IN_DISPLAY_CUTOUT_MODE_SHORT_EDGES
-    }
-
-    private fun tryAdd(view: View, params: WindowManager.LayoutParams): Boolean = try {
-        wm.addView(view, params)
-        true
-    } catch (e: Exception) {
-        false
     }
 
     private fun removeSafely(view: View?) {

@@ -8,6 +8,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.fillMaxWidth
+import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
@@ -31,6 +32,7 @@ import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Color
+import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.input.pointer.pointerInteropFilter
 import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.unit.dp
@@ -103,6 +105,9 @@ fun SidebarOverlay(
 
 @Composable
 private fun Panel(onStop: () -> Unit, sampler: StatsSampler) {
+    // Never taller than the screen allows (landscape games have little height); the panel scrolls.
+    val screenDp = LocalConfiguration.current.screenHeightDp
+    val maxPanelHeight = (screenDp * 0.85f).coerceIn(160f, 440f).dp
     val settings by OverlayController.settings.collectAsState()
     var stats by remember { mutableStateOf<StatsSnapshot?>(null) }
     // Runs only while the panel is open: closing the panel cancels it (no background polling).
@@ -112,13 +117,13 @@ private fun Panel(onStop: () -> Unit, sampler: StatsSampler) {
     Column(
         modifier = Modifier
             .width(236.dp)
-            .heightIn(max = 300.dp)
+            .heightIn(max = maxPanelHeight)
             .clip(shape)
-            .background(FxColors.Card.copy(alpha = 0.97f))
-            .border(1.dp, FxColors.Blue.copy(alpha = 0.4f), shape)
+            .background(PANEL_BACKGROUND)
+            .border(1.dp, FxColors.Blue, shape)
             .verticalScroll(rememberScrollState())
-            .padding(12.dp),
-        verticalArrangement = Arrangement.spacedBy(8.dp),
+            .padding(16.dp),
+        verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
         Text("FeatherX Tools", color = FxColors.Text, fontWeight = FontWeight.Bold)
 
@@ -146,6 +151,8 @@ private fun Panel(onStop: () -> Unit, sampler: StatsSampler) {
             )
         }
 
+        SectionDivider()
+
         // ---- Screen filter
         SwitchRow("Screen filter", settings.filterOn) { on -> OverlayController.update { it.copy(filterOn = on) } }
         if (settings.filterOn) {
@@ -162,6 +169,8 @@ private fun Panel(onStop: () -> Unit, sampler: StatsSampler) {
                 valueRange = 0f..100f,
             )
         }
+
+        SectionDivider()
 
         // ---- Live stats
         Text("Live stats", color = FxColors.BlueSoft, fontWeight = FontWeight.SemiBold)
@@ -194,8 +203,23 @@ private fun Panel(onStop: () -> Unit, sampler: StatsSampler) {
             StatRow("Upload", SpeedCalc.format(s.upBytesPerSec), FxColors.Text)
         }
 
+        SectionDivider()
         Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text("Stop overlay") }
     }
+}
+
+/** Solid, fully opaque: nothing from the app or game underneath can show through the panel. */
+private val PANEL_BACKGROUND = Color(0xFF0D1628)
+
+@Composable
+private fun SectionDivider() {
+    Box(
+        Modifier
+            .padding(vertical = 4.dp)
+            .fillMaxWidth()
+            .height(1.dp)
+            .background(FxColors.Blue.copy(alpha = 0.35f)),
+    )
 }
 
 @Composable
