@@ -188,13 +188,14 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
                     val cardH = (maxHeight - 130.dp).coerceIn(150.dp, 330.dp)
                     val cardW = (cardH * 0.72f).coerceAtMost(maxWidth * 0.62f)
+                    val sidePad = (maxWidth - cardW) / 2 // read here: maxWidth is not reachable inside Column {}
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
                         DeckPager(
-                            pagerState, library, vm, bob, cardW, cardH, (maxWidth - cardW) / 2,
+                            pagerState, library, vm, bob, cardW, cardH, sidePad,
                             Modifier.fillMaxWidth().height(cardH + 28.dp),
                         ) { page -> scope.launch { pagerState.animateScrollToPage(page) } }
                         Spacer(Modifier.height(14.dp))
