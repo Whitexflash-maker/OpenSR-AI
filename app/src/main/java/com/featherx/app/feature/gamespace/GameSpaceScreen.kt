@@ -20,6 +20,7 @@ import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.PaddingValues
 import androidx.compose.foundation.layout.Row
 import androidx.compose.foundation.layout.Spacer
+import androidx.compose.foundation.layout.fillMaxHeight
 import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
@@ -86,11 +87,11 @@ import kotlin.math.roundToInt
 import kotlinx.coroutines.flow.drop
 import kotlinx.coroutines.launch
 
-private val SpaceBlack = Color(0xFF050811)
-
 /**
- * Horizontal "game deck": a space scene, a snapping carousel of floating game cards, and one big LAUNCH
- * button under the centred card. Add / Refresh / Remove live in the top bar as small icon pills.
+ * Horizontal "game deck": a snapping carousel of floating game cards and one big LAUNCH button under the
+ * centred card. Add / Refresh / Remove are small icon pills. On short screens (landscape) the deck fills the
+ * height and the pills + LAUNCH move into a column on the right. The space scene itself is drawn by the app
+ * behind the status bar and the bottom bar ([SpaceBackdrop]).
  */
 @Composable
 fun GameSpaceScreen(vm: GameSpaceViewModel) {
@@ -121,88 +122,86 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
         }
     }
 
-    val infinite = rememberInfiniteTransition(label = "space")
-    val bob = infinite.animateFloat(
+    val bob = rememberInfiniteTransition(label = "float").animateFloat(
         initialValue = 0f, targetValue = 1f,
         animationSpec = infiniteRepeatable(tween(2600, easing = FastOutSlowInEasing), RepeatMode.Reverse),
         label = "bob",
     )
-    val twinkle = infinite.animateFloat(
-        initialValue = 0.55f, targetValue = 1f,
-        animationSpec = infiniteRepeatable(tween(3200, easing = LinearEasing), RepeatMode.Reverse),
-        label = "twinkle",
-    )
 
-    Box(Modifier.fillMaxSize().spaceBackground(pagerState, twinkle)) {
-        Column(Modifier.fillMaxSize()) {
-            TopBar(
-                count = library.size,
-                loading = vm.loading,
-                canRemove = library.isNotEmpty(),
-                onAdd = { showAddDialog = true },
-                onRefresh = { if (!vm.loading) vm.refresh() },
-                onRemove = {
-                    library.getOrNull(pagerState.currentPage)?.let { vm.remove(it.app.packageName) }
-                },
-            )
+    val launchSelected = {
+        library.getOrNull(pagerState.currentPage)?.let { vm.launch(it.app.packageName) }
+        Unit
+    }
+    val removeSelected = {
+        library.getOrNull(pagerState.currentPage)?.let { vm.remove(it.app.packageName) }
+        Unit
+    }
 
-            vm.message?.let { text ->
-                Text(
-                    text,
-                    modifier = Modifier.padding(horizontal = 16.dp),
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.error,
-                )
-            }
+    BoxWithConstraints(Modifier.fillMaxSize()) {
+        val compact = maxWidth > maxHeight && maxHeight < 380.dp
 
-            if (library.isEmpty()) {
+        if (library.isEmpty()) {
+            Column(Modifier.fillMaxSize()) {
+                if (!compact) TopBar(0, vm.loading, false, { showAddDialog = true }, { if (!vm.loading) vm.refresh() }, removeSelected)
                 EmptyStage(loading = vm.loading, onAdd = { showAddDialog = true })
-            } else {
+            }
+        } else if (compact) {
+            // ---- landscape: deck on the left, controls on the right
+            Row(Modifier.fillMaxSize().padding(horizontal = 12.dp), verticalAlignment = Alignment.CenterVertically) {
+                BoxWithConstraints(Modifier.weight(1f).fillMaxHeight()) {
+                    val cardH = (maxHeight - 12.dp).coerceIn(90.dp, 300.dp)
+                    val cardW = (cardH * 0.72f).coerceAtMost(maxWidth * 0.5f)
+                    DeckPager(
+                        pagerState, library, vm, bob, cardW, cardH, (maxWidth - cardW) / 2,
+                        Modifier.fillMaxSize(),
+                    ) { page -> scope.launch { pagerState.animateScrollToPage(page) } }
+                }
+                Column(
+                    modifier = Modifier.width(176.dp),
+                    horizontalAlignment = Alignment.CenterHorizontally,
+                    verticalArrangement = Arrangement.spacedBy(10.dp, Alignment.CenterVertically),
+                ) {
+                    Text(
+                        "${pagerState.currentPage + 1} / ${library.size}",
+                        style = MaterialTheme.typography.labelMedium,
+                        color = FxColors.Muted,
+                    )
+                    ActionPills(vm.loading, true, { showAddDialog = true }, { if (!vm.loading) vm.refresh() }, removeSelected)
+                    LaunchButton(launchSelected, compact = true)
+                    vm.message?.let {
+                        Text(it, style = MaterialTheme.typography.bodySmall, color = MaterialTheme.colorScheme.error, textAlign = TextAlign.Center)
+                    }
+                }
+            }
+        } else {
+            // ---- portrait: top bar, deck, LAUNCH
+            Column(Modifier.fillMaxSize()) {
+                TopBar(library.size, vm.loading, true, { showAddDialog = true }, { if (!vm.loading) vm.refresh() }, removeSelected)
+                vm.message?.let { text ->
+                    Text(
+                        text,
+                        modifier = Modifier.padding(horizontal = 16.dp),
+                        style = MaterialTheme.typography.bodySmall,
+                        color = MaterialTheme.colorScheme.error,
+                    )
+                }
                 BoxWithConstraints(Modifier.weight(1f).fillMaxWidth()) {
-                    // Cards shrink on short (landscape) screens so the LAUNCH button always fits.
-                    val cardH = (maxHeight - 130.dp).coerceIn(170.dp, 330.dp)
+                    val cardH = (maxHeight - 130.dp).coerceIn(150.dp, 330.dp)
                     val cardW = (cardH * 0.72f).coerceAtMost(maxWidth * 0.62f)
-                    val sidePadding = (maxWidth - cardW) / 2
-
                     Column(
                         modifier = Modifier.fillMaxSize(),
                         verticalArrangement = Arrangement.Center,
                         horizontalAlignment = Alignment.CenterHorizontally,
                     ) {
-                        HorizontalPager(
-                            state = pagerState,
-                            modifier = Modifier.fillMaxWidth().height(cardH + 28.dp),
-                            contentPadding = PaddingValues(horizontal = sidePadding),
-                            pageSize = PageSize.Fixed(cardW),
-                            pageSpacing = 14.dp,
-                            verticalAlignment = Alignment.CenterVertically,
-                            key = { library.getOrNull(it)?.app?.packageName ?: it },
-                        ) { page ->
-                            val entry = library.getOrNull(page)
-                            if (entry != null) {
-                                // 1 when centred, 0 one page away.
-                                val distance = abs((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
-                                val selected = (1f - distance).coerceIn(0f, 1f)
-                                GameCard(
-                                    entry = entry,
-                                    vm = vm,
-                                    bob = bob,
-                                    selected = selected,
-                                    modifier = Modifier.width(cardW).height(cardH),
-                                    onTap = { scope.launch { pagerState.animateScrollToPage(page) } },
-                                )
-                            }
-                        }
-
+                        DeckPager(
+                            pagerState, library, vm, bob, cardW, cardH, (maxWidth - cardW) / 2,
+                            Modifier.fillMaxWidth().height(cardH + 28.dp),
+                        ) { page -> scope.launch { pagerState.animateScrollToPage(page) } }
                         Spacer(Modifier.height(14.dp))
-                        LaunchButton(
-                            onClick = {
-                                library.getOrNull(pagerState.currentPage)?.let { vm.launch(it.app.packageName) }
-                            },
-                        )
+                        LaunchButton(launchSelected, compact = false)
                         Spacer(Modifier.height(8.dp))
                         Text(
-                            text = "${pagerState.currentPage + 1} / ${library.size}",
+                            "${pagerState.currentPage + 1} / ${library.size}",
                             style = MaterialTheme.typography.labelMedium,
                             color = FxColors.Muted,
                         )
@@ -217,43 +216,44 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
     }
 }
 
-// ------------------------------------------------------------------ scene
-
-/** Deep-space canvas: faint nebula glows that drift slightly with the carousel, plus a static starfield. */
-private fun Modifier.spaceBackground(pager: PagerState, twinkle: State<Float>): Modifier = this
-    .background(SpaceBlack)
-    .drawBehind {
-        val drift = (pager.currentPage + pager.currentPageOffsetFraction) * 14.dp.toPx()
-        val w = size.width
-        val h = size.height
-        fun orb(color: Color, cx: Float, cy: Float, r: Float, a: Float) = drawCircle(
-            brush = Brush.radialGradient(listOf(color.copy(alpha = a), Color.Transparent), center = Offset(cx, cy), radius = r),
-            radius = r,
-            center = Offset(cx, cy),
-        )
-        orb(FxColors.Cyan, w * 0.88f - drift, h * 0.10f, w * 0.80f, 0.16f)
-        orb(Color(0xFF6D5BFF), w * 0.05f - drift * 0.6f, h * 0.45f, w * 0.75f, 0.12f)
-        orb(FxColors.Blue, w * 0.70f - drift * 0.8f, h * 0.95f, w * 0.85f, 0.14f)
-        for (s in STARS) {
-            val a = if (s.twinkles) s.alpha * twinkle.value else s.alpha
-            drawCircle(Color.White.copy(alpha = a), radius = s.radius.dp.toPx(), center = Offset(s.x * w, s.y * h))
+@Composable
+private fun DeckPager(
+    pagerState: PagerState,
+    library: List<LibraryEntry>,
+    vm: GameSpaceViewModel,
+    bob: State<Float>,
+    cardW: Dp,
+    cardH: Dp,
+    sidePadding: Dp,
+    modifier: Modifier,
+    onTapPage: (Int) -> Unit,
+) {
+    HorizontalPager(
+        state = pagerState,
+        modifier = modifier,
+        contentPadding = PaddingValues(horizontal = sidePadding),
+        pageSize = PageSize.Fixed(cardW),
+        pageSpacing = 14.dp,
+        verticalAlignment = Alignment.CenterVertically,
+        key = { library.getOrNull(it)?.app?.packageName ?: it },
+    ) { page ->
+        val entry = library.getOrNull(page)
+        if (entry != null) {
+            // 1 when centred, 0 one page away.
+            val distance = abs((pagerState.currentPage - page) + pagerState.currentPageOffsetFraction)
+            GameCard(
+                entry = entry,
+                vm = vm,
+                bob = bob,
+                selected = (1f - distance).coerceIn(0f, 1f),
+                modifier = Modifier.width(cardW).height(cardH),
+                onTap = { onTapPage(page) },
+            )
         }
     }
-
-private class Star(val x: Float, val y: Float, val radius: Float, val alpha: Float, val twinkles: Boolean)
-
-/** Fixed seed, so the sky looks the same every time. */
-private val STARS: List<Star> = java.util.Random(7).let { rnd ->
-    List(70) {
-        Star(
-            x = rnd.nextFloat(),
-            y = rnd.nextFloat(),
-            radius = 0.4f + rnd.nextFloat() * 1.0f,
-            alpha = 0.25f + rnd.nextFloat() * 0.6f,
-            twinkles = rnd.nextInt(3) == 0,
-        )
-    }
 }
+
+// ------------------------------------------------------------------ bars
 
 @Composable
 private fun TopBar(
@@ -276,16 +276,21 @@ private fun TopBar(
                 color = FxColors.Muted,
             )
         }
-        Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
-            IconPill(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = "Add game", tint = FxColors.Cyan) }
-            IconPill(onClick = onRefresh) {
-                if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = FxColors.Cyan)
-                else Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = FxColors.Text)
-            }
-            if (canRemove) {
-                IconPill(onClick = onRemove) {
-                    Icon(Icons.Filled.Delete, contentDescription = "Remove selected game", tint = FxColors.Danger)
-                }
+        ActionPills(loading, canRemove, onAdd, onRefresh, onRemove)
+    }
+}
+
+@Composable
+private fun ActionPills(loading: Boolean, canRemove: Boolean, onAdd: () -> Unit, onRefresh: () -> Unit, onRemove: () -> Unit) {
+    Row(horizontalArrangement = Arrangement.spacedBy(8.dp), verticalAlignment = Alignment.CenterVertically) {
+        IconPill(onClick = onAdd) { Icon(Icons.Filled.Add, contentDescription = "Add game", tint = FxColors.Cyan) }
+        IconPill(onClick = onRefresh) {
+            if (loading) CircularProgressIndicator(Modifier.size(18.dp), strokeWidth = 2.dp, color = FxColors.Cyan)
+            else Icon(Icons.Filled.Refresh, contentDescription = "Refresh", tint = FxColors.Text)
+        }
+        if (canRemove) {
+            IconPill(onClick = onRemove) {
+                Icon(Icons.Filled.Delete, contentDescription = "Remove selected game", tint = FxColors.Danger)
             }
         }
     }
@@ -328,6 +333,7 @@ private fun EmptyStage(loading: Boolean, onAdd: () -> Unit) {
 /**
  * One translucent glass pedestal. [selected] is 1 for the centred card and fades to 0 for the others:
  * it drives size, brightness, the cyan rim and the glow. The icon bobs up and down forever ([bob]).
+ * The icon size follows the card height, so cards also work on short (landscape) screens.
  */
 @Composable
 private fun GameCard(
@@ -342,7 +348,7 @@ private fun GameCard(
     val profiled by OverlayController.profiled.collectAsState()
     val hasProfile = entry.app.packageName in profiled
 
-    Box(
+    BoxWithConstraints(
         modifier = modifier
             .graphicsLayer {
                 val scale = 0.84f + 0.16f * selected
@@ -377,16 +383,18 @@ private fun GameCard(
             .clickable(indication = null, interactionSource = remember { MutableInteractionSource() }, onClick = onTap),
         contentAlignment = Alignment.Center,
     ) {
+        val iconSize = (maxHeight * 0.40f).coerceIn(44.dp, 84.dp)
+        val roomy = maxHeight >= 220.dp
         Column(
             horizontalAlignment = Alignment.CenterHorizontally,
-            modifier = Modifier.padding(16.dp),
+            modifier = Modifier.padding(if (roomy) 16.dp else 8.dp),
         ) {
-            Box(Modifier.size(width = 120.dp, height = 128.dp), contentAlignment = Alignment.Center) {
+            Box(Modifier.size(width = iconSize + 36.dp, height = iconSize + 44.dp), contentAlignment = Alignment.Center) {
                 // contact glow on the "pedestal": shrinks as the icon rises
                 Box(
                     Modifier
                         .align(Alignment.BottomCenter)
-                        .size(width = 84.dp, height = 12.dp)
+                        .size(width = iconSize, height = 12.dp)
                         .graphicsLayer {
                             val s = 1f - 0.25f * bob.value
                             scaleX = s
@@ -399,40 +407,42 @@ private fun GameCard(
                 AppIcon(
                     packageName = entry.app.packageName,
                     vm = vm,
-                    size = 84.dp,
+                    size = iconSize,
                     modifier = Modifier.offset {
                         // levitation: -7 dp .. +7 dp, read in the layout phase (no recomposition per frame)
                         IntOffset(0, ((bob.value - 0.5f) * -14.dp.toPx()).roundToInt())
                     },
                 )
             }
-            Spacer(Modifier.height(10.dp))
+            Spacer(Modifier.height(if (roomy) 10.dp else 2.dp))
             Text(
                 text = entry.app.label,
-                style = MaterialTheme.typography.titleSmall,
+                style = if (roomy) MaterialTheme.typography.titleSmall else MaterialTheme.typography.labelMedium,
                 color = FxColors.Text,
                 textAlign = TextAlign.Center,
-                maxLines = 2,
+                maxLines = if (roomy) 2 else 1,
                 overflow = TextOverflow.Ellipsis,
             )
-            Spacer(Modifier.height(4.dp))
-            Text(
-                text = if (hasProfile) "Profile saved" else if (entry.addedByUser) "Added by you" else "Detected",
-                style = MaterialTheme.typography.labelSmall,
-                color = if (hasProfile) FxColors.Cyan else FxColors.Muted,
-            )
+            if (roomy) {
+                Spacer(Modifier.height(4.dp))
+                Text(
+                    text = if (hasProfile) "Profile saved" else if (entry.addedByUser) "Added by you" else "Detected",
+                    style = MaterialTheme.typography.labelSmall,
+                    color = if (hasProfile) FxColors.Cyan else FxColors.Muted,
+                )
+            }
         }
     }
 }
 
 /** Big glowing LAUNCH button: springy press + haptic (from fxClickable). */
 @Composable
-private fun LaunchButton(onClick: () -> Unit) {
+private fun LaunchButton(onClick: () -> Unit, compact: Boolean) {
     val shape = RoundedCornerShape(50)
     Box(
         modifier = Modifier
-            .width(220.dp)
-            .height(56.dp)
+            .width(if (compact) 150.dp else 220.dp)
+            .height(if (compact) 46.dp else 56.dp)
             .fxClickable(onClick)
             .drawBehind {
                 drawCircle(
@@ -453,7 +463,7 @@ private fun LaunchButton(onClick: () -> Unit) {
             text = "LAUNCH",
             color = SpaceBlack,
             fontWeight = FontWeight.Bold,
-            fontSize = 17.sp,
+            fontSize = if (compact) 15.sp else 17.sp,
             letterSpacing = 3.sp,
         )
     }

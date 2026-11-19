@@ -29,6 +29,7 @@ import androidx.compose.ui.Modifier
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.featherx.app.feature.gamespace.GameSpaceScreen
+import com.featherx.app.feature.gamespace.SpaceBackdrop
 import com.featherx.app.feature.gamespace.GameSpaceViewModel
 import com.featherx.app.feature.home.HomeScreen
 import com.featherx.app.feature.performance.PerformanceScreen
@@ -60,6 +61,7 @@ fun FeatherXApp(proTools: ProToolsViewModel, gameSpace: GameSpaceViewModel) {
             .fillMaxSize()
             .background(FxColors.Black)
             .drawBehind {
+                if (current == Destination.GameSpace) return@drawBehind
                 drawRect(
                     Brush.radialGradient(
                         listOf(FxColors.Cyan.copy(alpha = 0.12f), Color.Transparent),
@@ -76,10 +78,18 @@ fun FeatherXApp(proTools: ProToolsViewModel, gameSpace: GameSpaceViewModel) {
                 )
             },
     ) {
+    // The Games tab draws its space scene under the status bar and the bottom bar too (edge to edge).
+    if (current == Destination.GameSpace) SpaceBackdrop(Modifier.fillMaxSize())
     Scaffold(
         containerColor = Color.Transparent,
         bottomBar = {
-            NavigationBar(containerColor = FxColors.Navy, tonalElevation = 0.dp) {
+            NavigationBar(
+                containerColor = Color.Transparent, // see-through: the scene / glow shows behind the tabs
+                tonalElevation = 0.dp,
+                modifier = Modifier.drawBehind {
+                    drawLine(FxColors.Border, Offset(0f, 0f), Offset(size.width, 0f), strokeWidth = 1.dp.toPx())
+                },
+            ) {
                 destinations.forEachIndexed { index, destination ->
                     NavigationBarItem(
                         selected = index == selected,
