@@ -4,7 +4,6 @@ import android.view.MotionEvent
 import androidx.compose.animation.AnimatedVisibility
 import androidx.compose.animation.Crossfade
 import androidx.compose.animation.core.Spring
-import androidx.compose.animation.core.animateDpAsState
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.animation.core.tween
@@ -43,7 +42,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.draw.alpha
+import androidx.compose.ui.graphics.graphicsLayer
 import androidx.compose.ui.draw.clip
 import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
@@ -54,6 +53,10 @@ import androidx.compose.ui.platform.LocalConfiguration
 import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.featherx.app.ui.FxChip
+import com.featherx.app.ui.FxGlyph
+import com.featherx.app.ui.Glyph
+import com.featherx.app.ui.FxRoundToggle
+import com.featherx.app.ui.Glyph
 import com.featherx.app.ui.HairDivider
 import com.featherx.app.ui.theme.FxColors
 import java.util.Locale
@@ -102,14 +105,14 @@ fun SidebarOverlay(
             animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
             label = "handleAlpha",
         )
-        val barWidth by animateDpAsState(
-            targetValue = if (pressed) 9.dp else 5.dp,
+        val buttonScale by animateFloatAsState(
+            targetValue = if (pressed) 0.88f else 1f,
             animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
-            label = "handleWidth",
+            label = "handleScale",
         )
         Box(
             modifier = Modifier
-                .size(width = 30.dp, height = 96.dp)
+                .size(60.dp) // bigger invisible touch area around the round button
                 .pointerInteropFilter { ev ->
                     when (ev.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
@@ -142,15 +145,24 @@ fun SidebarOverlay(
                         else -> true
                     }
                 },
-            contentAlignment = Alignment.CenterEnd,
+            contentAlignment = Alignment.Center,
         ) {
+            // Round glass button with a cyan ring and a crosshair mark. 0.30 alpha idle, 0.85 when touched/open.
             Box(
                 Modifier
-                    .size(width = barWidth, height = 56.dp)
-                    .alpha(handleAlpha)
-                    .clip(RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp))
-                    .background(Brush.verticalGradient(listOf(FxColors.Cyan, FxColors.Blue))),
-            )
+                    .size(44.dp)
+                    .graphicsLayer {
+                        scaleX = buttonScale
+                        scaleY = buttonScale
+                        alpha = handleAlpha
+                    }
+                    .clip(CircleShape)
+                    .background(Brush.verticalGradient(listOf(Color(0xFF16213A), PANEL)))
+                    .border(1.5.dp, Brush.linearGradient(listOf(FxColors.Cyan, FxColors.Blue)), CircleShape),
+                contentAlignment = Alignment.Center,
+            ) {
+                FxGlyph(Glyph.CROSSHAIR, tint = FxColors.Cyan, size = 22.dp)
+            }
         }
     }
 }
@@ -227,27 +239,30 @@ private fun levelColor(level: HealthLevel): Color = when (level) {
 private fun ToolsPage(s: OverlaySettings) {
     val spring = spring<androidx.compose.ui.unit.IntSize>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
     Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ToolHeader(com.featherx.app.ui.Glyph.CROSSHAIR, "Crosshair", s.crosshairOn) { on ->
-                OverlayController.update { it.copy(crosshairOn = on) }
-            }
-            AnimatedVisibility(s.crosshairOn, enter = expandVertically(spring) + fadeIn(), exit = shrinkVertically(spring) + fadeOut()) {
+        // Round quick toggles
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceEvenly) {
+            FxRoundToggle(Glyph.CROSSHAIR, "Crosshair", s.crosshairOn, onClick = {
+                OverlayController.update { it.copy(crosshairOn = !it.crosshairOn) }
+            })
+            FxRoundToggle(Glyph.FILTER, "Filter", s.filterOn, onClick = {
+                OverlayController.update { it.copy(filterOn = !it.filterOn) }
+            })
+            MuteToggle()
+        }
+        AnimatedVisibility(s.crosshairOn, enter = expandVertically(spring) + fadeIn(), exit = shrinkVertically(spring) + fadeOut()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                HairDivider()
                 CrosshairControls(s)
             }
         }
-        HairDivider()
-        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-            ToolHeader(com.featherx.app.ui.Glyph.FILTER, "Screen filter", s.filterOn) { on ->
-                OverlayController.update { it.copy(filterOn = on) }
-            }
-            AnimatedVisibility(s.filterOn, enter = expandVertically(spring) + fadeIn(), exit = shrinkVertically(spring) + fadeOut()) {
+        AnimatedVisibility(s.filterOn, enter = expandVertically(spring) + fadeIn(), exit = shrinkVertically(spring) + fadeOut()) {
+            Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                HairDivider()
                 FilterControls(s)
             }
         }
         HairDivider()
         StopwatchRow()
-        HairDivider()
-        MuteRow()
         HairDivider()
         ProfileRow()
     }

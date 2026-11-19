@@ -7,8 +7,6 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.size
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.SliderDefaults
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
@@ -27,6 +25,8 @@ import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.dp
 import com.featherx.app.ui.FxButton
 import com.featherx.app.ui.FxChip
+import com.featherx.app.ui.FxDial
+import com.featherx.app.ui.FxRoundToggle
 import com.featherx.app.ui.FxGlyph
 import com.featherx.app.ui.FxSwatch
 import com.featherx.app.ui.FxSwitch
@@ -60,39 +60,12 @@ fun ToolHeader(glyph: Glyph, title: String, checked: Boolean? = null, onChecked:
     }
 }
 
-@Composable
-fun LabeledSlider(
-    label: String,
-    valueText: String,
-    value: Float,
-    range: ClosedFloatingPointRange<Float>,
-    onChange: (Float) -> Unit,
-) {
-    Column {
-        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-            Text(label, style = MaterialTheme.typography.labelMedium, color = FxColors.Muted)
-            Text(valueText, style = MaterialTheme.typography.labelMedium, color = FxColors.Text)
-        }
-        Slider(
-            value = value,
-            onValueChange = onChange,
-            valueRange = range,
-            modifier = Modifier.height(32.dp),
-            colors = SliderDefaults.colors(
-                thumbColor = FxColors.Cyan,
-                activeTrackColor = FxColors.Cyan,
-                inactiveTrackColor = FxColors.Border,
-            ),
-        )
-    }
-}
-
 private fun signed(v: Int) = if (v > 0) "+$v" else "$v"
 
-/** Presets, colours, size and fine X / Y offset. */
+/** Presets, colours, and three round dials: size, fine X offset, fine Y offset. */
 @Composable
 fun CrosshairControls(s: OverlaySettings) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
         Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
             CrosshairStyle.entries.forEach { st ->
                 FxChip(st.label, s.crosshairStyle == st) { OverlayController.update { it.copy(crosshairStyle = st) } }
@@ -103,31 +76,34 @@ fun CrosshairControls(s: OverlaySettings) {
                 FxSwatch(Color(c.argb), s.crosshairColor == c) { OverlayController.update { it.copy(crosshairColor = c) } }
             }
         }
-        LabeledSlider(
-            "Size", "${s.crosshairSizeDp} dp", s.crosshairSizeDp.toFloat(),
-            OverlaySettings.MIN_CROSSHAIR_DP.toFloat()..OverlaySettings.MAX_CROSSHAIR_DP.toFloat(),
-        ) { v -> OverlayController.update { it.copy(crosshairSizeDp = v.roundToInt()) } }
         val m = OverlaySettings.MAX_OFFSET_DP.toFloat()
-        LabeledSlider("Offset X", signed(s.crosshairOffsetXDp), s.crosshairOffsetXDp.toFloat(), -m..m) { v ->
-            OverlayController.update { it.copy(crosshairOffsetXDp = v.roundToInt()) }
-        }
-        LabeledSlider("Offset Y", signed(s.crosshairOffsetYDp), s.crosshairOffsetYDp.toFloat(), -m..m) { v ->
-            OverlayController.update { it.copy(crosshairOffsetYDp = v.roundToInt()) }
+        Row(Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
+            FxDial(
+                "Size", "${s.crosshairSizeDp}", s.crosshairSizeDp.toFloat(),
+                OverlaySettings.MIN_CROSSHAIR_DP.toFloat()..OverlaySettings.MAX_CROSSHAIR_DP.toFloat(),
+                { v -> OverlayController.update { it.copy(crosshairSizeDp = v.roundToInt()) } },
+            )
+            FxDial("X", signed(s.crosshairOffsetXDp), s.crosshairOffsetXDp.toFloat(), -m..m, { v ->
+                OverlayController.update { it.copy(crosshairOffsetXDp = v.roundToInt()) }
+            })
+            FxDial("Y", signed(s.crosshairOffsetYDp), s.crosshairOffsetYDp.toFloat(), -m..m, { v ->
+                OverlayController.update { it.copy(crosshairOffsetYDp = v.roundToInt()) }
+            })
         }
     }
 }
 
 @Composable
 fun FilterControls(s: OverlaySettings) {
-    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
-        Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+    Row(Modifier.fillMaxWidth(), verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.SpaceBetween) {
+        Column(verticalArrangement = Arrangement.spacedBy(6.dp)) {
             FilterMode.entries.forEach { m ->
                 FxChip(m.label, s.filterMode == m) { OverlayController.update { it.copy(filterMode = m) } }
             }
         }
-        LabeledSlider("Strength", "${s.filterStrength}%", s.filterStrength.toFloat(), 0f..100f) { v ->
+        FxDial("Strength", "${s.filterStrength}%", s.filterStrength.toFloat(), 0f..100f, { v ->
             OverlayController.update { it.copy(filterStrength = v.roundToInt()) }
-        }
+        })
     }
 }
 
@@ -237,4 +213,26 @@ fun ProfileRow() {
             }
         }
     }
+}
+
+/** Round quick-toggle for Do Not Disturb (same logic as [MuteRow]). Opens Android's access screen the first time. */
+@Composable
+fun MuteToggle() {
+    val context = LocalContext.current
+    val mute = remember { QuickMute(context) }
+    var muted by remember { mutableStateOf(mute.isMuted()) }
+    var access by remember { mutableStateOf(mute.hasAccess()) }
+    LaunchedEffect(Unit) {
+        while (true) {
+            muted = mute.isMuted()
+            access = mute.hasAccess()
+            delay(1500)
+        }
+    }
+    FxRoundToggle(Glyph.BELL, if (!access) "Allow DND" else "Mute", muted && access, onClick = {
+        if (!access) mute.openAccessSettings() else {
+            mute.toggle()
+            muted = mute.isMuted()
+        }
+    })
 }

@@ -4,6 +4,13 @@ import androidx.compose.animation.core.Spring
 import androidx.compose.animation.core.animateFloatAsState
 import androidx.compose.animation.core.spring
 import androidx.compose.foundation.Canvas
+import androidx.compose.foundation.gestures.detectDragGestures
+import androidx.compose.foundation.gestures.detectTapGestures
+import androidx.compose.runtime.rememberUpdatedState
+import androidx.compose.ui.input.pointer.pointerInput
+import kotlin.math.atan2
+import kotlin.math.cos
+import kotlin.math.sin
 import androidx.compose.foundation.interaction.MutableInteractionSource
 import androidx.compose.foundation.interaction.collectIsPressedAsState
 import androidx.compose.material3.Switch
@@ -21,6 +28,7 @@ import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.ColumnScope
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.fillMaxSize
 import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.padding
@@ -34,6 +42,7 @@ import androidx.compose.runtime.Composable
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.draw.drawBehind
 import androidx.compose.ui.geometry.Offset
 import androidx.compose.ui.geometry.Rect
 import androidx.compose.ui.geometry.Size
@@ -328,4 +337,109 @@ fun FxGlyph(glyph: Glyph, modifier: Modifier = Modifier, tint: Color = LocalCont
 
 private fun DrawScope.line(color: Color, stroke: Stroke, x1: Float, y1: Float, x2: Float, y2: Float) {
     drawLine(color, Offset(x1, y1), Offset(x2, y2), strokeWidth = stroke.width, cap = StrokeCap.Round)
+}
+
+// ------------------------------------------------------------------ round controls
+
+/** Maps a touch point on a dial to 0..1. The arc starts bottom-left (135 deg) and sweeps 270 deg clockwise. */
+private fun dialFraction(pos: Offset, width: Float, height: Float): Float {
+    val deg = Math.toDegrees(atan2((pos.y - height / 2f).toDouble(), (pos.x - width / 2f).toDouble())).toFloat()
+    val a = (deg - 135f + 360f) % 360f
+    return when {
+        a <= 270f -> a / 270f
+        a < 315f -> 1f   // in the gap, nearer to the end
+        else -> 0f       // in the gap, nearer to the start
+    }
+}
+
+/**
+ * Circular dial instead of a straight slider: drag (or tap) anywhere around the ring.
+ * The value is shown in the middle, the name below.
+ */
+@Composable
+fun FxDial(
+    label: String,
+    valueText: String,
+    value: Float,
+    range: ClosedFloatingPointRange<Float>,
+    onChange: (Float) -> Unit,
+    modifier: Modifier = Modifier,
+) {
+    val haptic = LocalHapticFeedback.current
+    val latest by rememberUpdatedState(onChange)
+    val fraction = ((value - range.start) / (range.endInclusive - range.start)).coerceIn(0f, 1f)
+    fun apply(pos: Offset, w: Float, h: Float) {
+        latest(range.start + dialFraction(pos, w, h) * (range.endInclusive - range.start))
+    }
+
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally) {
+        Box(
+            modifier = Modifier
+                .size(72.dp)
+                .pointerInput(range) {
+                    detectTapGestures { apply(it, size.width.toFloat(), size.height.toFloat()) }
+                }
+                .pointerInput(range) {
+                    detectDragGestures(
+                        onDragStart = {
+                            haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                            apply(it, size.width.toFloat(), size.height.toFloat())
+                        },
+                        onDrag = { change, _ ->
+                            change.consume()
+                            apply(change.position, size.width.toFloat(), size.height.toFloat())
+                        },
+                    )
+                },
+            contentAlignment = Alignment.Center,
+        ) {
+            Canvas(Modifier.fillMaxSize()) {
+                val stroke = 7.dp.toPx()
+                val inset = stroke / 2f + 4.dp.toPx()
+                val arcSize = Size(size.width - inset * 2, size.height - inset * 2)
+                val topLeft = Offset(inset, inset)
+                val style = Stroke(width = stroke, cap = StrokeCap.Round)
+                drawArc(Color(0x24FFFFFF), 135f, 270f, false, topLeft, arcSize, style = style)
+                if (fraction > 0f) {
+                    drawArc(FxColors.Cyan.copy(alpha = 0.25f), 135f, 270f * fraction, false, topLeft, arcSize, style = Stroke(width = stroke + 5.dp.toPx(), cap = StrokeCap.Round))
+                    drawArc(FxColors.Cyan, 135f, 270f * fraction, false, topLeft, arcSize, style = style)
+                }
+                // round knob at the end of the arc
+                val r = arcSize.width / 2f
+                val rad = Math.toRadians((135f + 270f * fraction).toDouble())
+                val knob = Offset(size.width / 2f + r * cos(rad).toFloat(), size.height / 2f + r * sin(rad).toFloat())
+                drawCircle(Color.White, radius = 5.dp.toPx(), center = knob)
+                drawCircle(FxColors.Cyan, radius = 5.dp.toPx(), center = knob, style = Stroke(width = 2.dp.toPx()))
+            }
+            Text(valueText, style = MaterialTheme.typography.labelMedium, color = FxColors.Text)
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = FxColors.Muted)
+    }
+}
+
+/** Round icon button with a name under it: glows cyan when on (like the quick tiles of a gaming phone). */
+@Composable
+fun FxRoundToggle(glyph: Glyph, label: String, on: Boolean, onClick: () -> Unit, modifier: Modifier = Modifier) {
+    Column(modifier, horizontalAlignment = Alignment.CenterHorizontally, verticalArrangement = Arrangement.spacedBy(4.dp)) {
+        Box(
+            modifier = Modifier
+                .size(54.dp)
+                .fxClickable(onClick)
+                .drawBehind {
+                    if (on) {
+                        drawCircle(
+                            Brush.radialGradient(listOf(FxColors.Cyan.copy(alpha = 0.35f), Color.Transparent)),
+                            radius = size.width * 0.85f,
+                        )
+                    }
+                }
+                .clip(CircleShape)
+                .background(if (on) FxColors.Cyan.copy(alpha = 0.16f) else Color(0x0DFFFFFF))
+                .border(1.5.dp, if (on) FxColors.Cyan else FxColors.Border, CircleShape),
+            contentAlignment = Alignment.Center,
+        ) {
+            FxGlyph(glyph, tint = if (on) FxColors.Cyan else FxColors.Muted, size = 24.dp)
+        }
+        Text(label, style = MaterialTheme.typography.labelSmall, color = if (on) FxColors.Cyan else FxColors.Muted)
+    }
 }
