@@ -8,6 +8,7 @@ import androidx.compose.runtime.setValue
 import androidx.compose.ui.graphics.ImageBitmap
 import androidx.compose.ui.graphics.asImageBitmap
 import androidx.lifecycle.AndroidViewModel
+import com.featherx.app.feature.protools.OverlayController
 import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
@@ -25,6 +26,10 @@ class GameSpaceViewModel(application: Application) : AndroidViewModel(applicatio
 
     private var prefs = LibraryPrefs()
     private var lastLaunch: Map<String, Long> = emptyMap()
+
+    init {
+        OverlayController.init(application)
+    }
 
     var loading by mutableStateOf(true)
         private set
@@ -71,6 +76,9 @@ class GameSpaceViewModel(application: Application) : AndroidViewModel(applicatio
             val now = System.currentTimeMillis()
             lastLaunch = lastLaunch + (packageName to now)
             repository.saveLaunch(packageName, now)
+            // Link this game to Pro Tools: applies its saved crosshair/filter profile, if it has one.
+            val label = library.firstOrNull { it.app.packageName == packageName }?.app?.label ?: packageName
+            OverlayController.onGameLaunched(packageName, label)
             message = null
             recompute()
         } else {

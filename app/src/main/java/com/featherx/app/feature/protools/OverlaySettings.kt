@@ -33,6 +33,9 @@ data class OverlaySettings(
     val crosshairStyle: CrosshairStyle = CrosshairStyle.DOT,
     val crosshairColor: CrosshairColor = CrosshairColor.RED,
     val crosshairSizeDp: Int = DEFAULT_CROSSHAIR_DP,
+    /** Fine offset from the exact screen centre, in dp. Positive X = right, positive Y = down. */
+    val crosshairOffsetXDp: Int = 0,
+    val crosshairOffsetYDp: Int = 0,
     val filterOn: Boolean = false,
     val filterMode: FilterMode = FilterMode.LIFT,
     /** 0..100 */
@@ -40,6 +43,8 @@ data class OverlaySettings(
 ) {
     fun sanitized(): OverlaySettings = copy(
         crosshairSizeDp = crosshairSizeDp.coerceIn(MIN_CROSSHAIR_DP, MAX_CROSSHAIR_DP),
+        crosshairOffsetXDp = crosshairOffsetXDp.coerceIn(-MAX_OFFSET_DP, MAX_OFFSET_DP),
+        crosshairOffsetYDp = crosshairOffsetYDp.coerceIn(-MAX_OFFSET_DP, MAX_OFFSET_DP),
         filterStrength = filterStrength.coerceIn(0, 100),
     )
 
@@ -49,7 +54,43 @@ data class OverlaySettings(
         return (alpha shl 24) or (filterMode.rgb and 0xFFFFFF)
     }
 
+    /** Compact text form for SharedPreferences (also used for per-game profiles). Values contain no '&' or '='. */
+    fun encode(): String = listOf(
+        "co" to crosshairOn,
+        "cs" to crosshairStyle.name,
+        "cc" to crosshairColor.name,
+        "sz" to crosshairSizeDp,
+        "ox" to crosshairOffsetXDp,
+        "oy" to crosshairOffsetYDp,
+        "fo" to filterOn,
+        "fm" to filterMode.name,
+        "fs" to filterStrength,
+    ).joinToString("&") { (k, v) -> "$k=$v" }
+
     companion object {
+        const val MAX_OFFSET_DP = 60
+
+        /** Inverse of [encode]. Missing or broken parts fall back to defaults; blank text gives null. */
+        fun decode(text: String?): OverlaySettings? {
+            if (text.isNullOrBlank()) return null
+            val map = text.split('&').mapNotNull {
+                val i = it.indexOf('=')
+                if (i <= 0) null else it.substring(0, i) to it.substring(i + 1)
+            }.toMap()
+            val d = OverlaySettings()
+            return OverlaySettings(
+                crosshairOn = map["co"] == "true",
+                crosshairStyle = enumOrDefault(map["cs"], d.crosshairStyle),
+                crosshairColor = enumOrDefault(map["cc"], d.crosshairColor),
+                crosshairSizeDp = map["sz"]?.toIntOrNull() ?: d.crosshairSizeDp,
+                crosshairOffsetXDp = map["ox"]?.toIntOrNull() ?: 0,
+                crosshairOffsetYDp = map["oy"]?.toIntOrNull() ?: 0,
+                filterOn = map["fo"] == "true",
+                filterMode = enumOrDefault(map["fm"], d.filterMode),
+                filterStrength = map["fs"]?.toIntOrNull() ?: d.filterStrength,
+            ).sanitized()
+        }
+
         const val MIN_CROSSHAIR_DP = 8
         const val MAX_CROSSHAIR_DP = 48
         const val DEFAULT_CROSSHAIR_DP = 20

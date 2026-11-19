@@ -1,50 +1,72 @@
 package com.featherx.app.feature.protools
 
 import android.view.MotionEvent
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.Crossfade
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.animateDpAsState
+import androidx.compose.animation.core.animateFloatAsState
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.core.tween
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.scaleIn
+import androidx.compose.animation.scaleOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.background
 import androidx.compose.foundation.border
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Box
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
+import androidx.compose.foundation.layout.Spacer
 import androidx.compose.foundation.layout.fillMaxWidth
-import androidx.compose.foundation.layout.height
 import androidx.compose.foundation.layout.heightIn
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.layout.size
 import androidx.compose.foundation.layout.width
 import androidx.compose.foundation.rememberScrollState
+import androidx.compose.foundation.shape.CircleShape
 import androidx.compose.foundation.shape.RoundedCornerShape
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
+import androidx.compose.material3.MaterialTheme
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
+import androidx.compose.runtime.mutableIntStateOf
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.remember
 import androidx.compose.runtime.setValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.ExperimentalComposeUiApi
 import androidx.compose.ui.Modifier
+import androidx.compose.ui.draw.alpha
 import androidx.compose.ui.draw.clip
+import androidx.compose.ui.graphics.Brush
 import androidx.compose.ui.graphics.Color
-import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.graphics.TransformOrigin
+import androidx.compose.ui.hapticfeedback.HapticFeedbackType
 import androidx.compose.ui.input.pointer.pointerInteropFilter
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.platform.LocalConfiguration
+import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.featherx.app.ui.FxChip
-import com.featherx.app.ui.FxSwatch
+import com.featherx.app.ui.HairDivider
 import com.featherx.app.ui.theme.FxColors
+import java.util.Locale
 import kotlin.math.abs
-import kotlin.math.roundToInt
+
+/** Solid navy of the panel. With background blur available it becomes slightly see-through ("frosted"). */
+private val PANEL = Color(0xFF0A0F1C)
 
 /**
- * The floating sidebar: a small handle on the right screen edge, and a panel that opens to its left.
- * Tap the handle to open/close, drag it to move it up or down.
+ * The floating HUD: a slim handle on the right screen edge and a panel with two mini-tabs (Tools / Stats)
+ * that springs open to its left. Tap the handle to open/close; drag it to move it up or down.
+ *
+ * @param frosted true when the window has a real blur behind it (Android 12+ devices that support it).
  */
 @OptIn(ExperimentalComposeUiApi::class)
 @Composable
@@ -55,23 +77,43 @@ fun SidebarOverlay(
     onMoveTo: (Float) -> Unit,
     onStop: () -> Unit,
     sampler: StatsSampler,
+    frosted: Boolean,
 ) {
+    val haptic = LocalHapticFeedback.current
+    val origin = TransformOrigin(1f, 0.5f) // grows out of the handle
+
     Row(verticalAlignment = Alignment.CenterVertically) {
-        if (expanded) {
-            Panel(onStop = onStop, sampler = sampler)
+        AnimatedVisibility(
+            visible = expanded,
+            enter = fadeIn(spring(stiffness = Spring.StiffnessMedium)) +
+                scaleIn(spring(dampingRatio = Spring.DampingRatioLowBouncy, stiffness = Spring.StiffnessMediumLow), initialScale = 0.9f, transformOrigin = origin),
+            exit = fadeOut(tween(120)) + scaleOut(tween(120), targetScale = 0.92f, transformOrigin = origin),
+        ) {
+            Panel(onStop = onStop, sampler = sampler, frosted = frosted)
         }
-        // Handle. Raw screen coordinates are used for dragging because the window itself moves
-        // while dragging, which would make window-relative coordinates jump.
+
+        // ---- Handle. Raw screen coordinates are used for dragging because the window itself moves while
+        // dragging, which would make window-relative coordinates jump.
         val touch = remember { FloatArray(2) } // [0]=finger raw Y at start, [1]=window Y at start
         var dragging by remember { mutableStateOf(false) }
+        var pressed by remember { mutableStateOf(false) }
+        val handleAlpha by animateFloatAsState(
+            targetValue = if (pressed || expanded) 0.85f else 0.30f,
+            animationSpec = spring(stiffness = Spring.StiffnessMediumLow),
+            label = "handleAlpha",
+        )
+        val barWidth by animateDpAsState(
+            targetValue = if (pressed) 9.dp else 5.dp,
+            animationSpec = spring(dampingRatio = Spring.DampingRatioMediumBouncy, stiffness = Spring.StiffnessMedium),
+            label = "handleWidth",
+        )
         Box(
             modifier = Modifier
-                .size(width = 24.dp, height = 84.dp)
-                .clip(RoundedCornerShape(topStart = 14.dp, bottomStart = 14.dp))
-                .background(FxColors.Blue.copy(alpha = 0.92f))
+                .size(width = 30.dp, height = 96.dp)
                 .pointerInteropFilter { ev ->
                     when (ev.actionMasked) {
                         MotionEvent.ACTION_DOWN -> {
+                            pressed = true
                             touch[0] = ev.rawY
                             touch[1] = currentY()
                             dragging = false
@@ -86,158 +128,186 @@ fun SidebarOverlay(
                             true
                         }
                         MotionEvent.ACTION_UP -> {
-                            if (!dragging) onToggle()
+                            pressed = false
+                            if (!dragging) {
+                                haptic.performHapticFeedback(HapticFeedbackType.TextHandleMove)
+                                onToggle()
+                            }
+                            true
+                        }
+                        MotionEvent.ACTION_CANCEL -> {
+                            pressed = false
                             true
                         }
                         else -> true
                     }
                 },
-            contentAlignment = Alignment.Center,
+            contentAlignment = Alignment.CenterEnd,
         ) {
-            Text(
-                text = if (expanded) "›" else "‹",
-                color = Color.White,
-                style = androidx.compose.material3.MaterialTheme.typography.titleLarge,
+            Box(
+                Modifier
+                    .size(width = barWidth, height = 56.dp)
+                    .alpha(handleAlpha)
+                    .clip(RoundedCornerShape(topStart = 5.dp, bottomStart = 5.dp))
+                    .background(Brush.verticalGradient(listOf(FxColors.Cyan, FxColors.Blue))),
             )
         }
     }
 }
 
 @Composable
-private fun Panel(onStop: () -> Unit, sampler: StatsSampler) {
-    // Never taller than the screen allows (landscape games have little height); the panel scrolls.
-    val screenDp = LocalConfiguration.current.screenHeightDp
-    val maxPanelHeight = (screenDp * 0.85f).coerceIn(160f, 440f).dp
+private fun Panel(onStop: () -> Unit, sampler: StatsSampler, frosted: Boolean) {
     val settings by OverlayController.settings.collectAsState()
     var stats by remember { mutableStateOf<StatsSnapshot?>(null) }
-    // Runs only while the panel is open: closing the panel cancels it (no background polling).
+    var tab by remember { mutableIntStateOf(0) }
+
+    // Measures only while the panel exists: closing the panel cancels it (no background polling).
     LaunchedEffect(Unit) { sampler.stream().collect { stats = it } }
 
-    val shape = RoundedCornerShape(14.dp)
+    val health = remember(stats) {
+        stats?.let { HealthCheck.assess(it.batteryTempC, it.ramFreeMb, it.ramTotalMb, it.lowMemory) }
+            ?: Health(HealthLevel.OK, null)
+    }
+
+    // Never taller than the screen allows (landscape has little height); the content scrolls.
+    val maxHeight = (LocalConfiguration.current.screenHeightDp * 0.85f).coerceIn(160f, 440f).dp
+    val shape = RoundedCornerShape(20.dp)
+
     Column(
         modifier = Modifier
-            .width(236.dp)
-            .heightIn(max = maxPanelHeight)
+            .padding(end = 6.dp)
+            .width(264.dp)
+            .heightIn(max = maxHeight)
             .clip(shape)
-            .background(PANEL_BACKGROUND)
-            .border(1.dp, FxColors.Blue, shape)
-            .verticalScroll(rememberScrollState())
-            .padding(16.dp),
+            .background(if (frosted) PANEL.copy(alpha = 0.86f) else PANEL)
+            .border(
+                1.dp,
+                Brush.linearGradient(listOf(Color(0x59FFFFFF), Color(0x14FFFFFF), Color(0x26FFFFFF))),
+                shape,
+            )
+            .padding(12.dp),
         verticalArrangement = Arrangement.spacedBy(10.dp),
     ) {
-        Text("FeatherX Tools", color = FxColors.Text, fontWeight = FontWeight.Bold)
-
-        // ---- Crosshair
-        SwitchRow("Crosshair", settings.crosshairOn) { on -> OverlayController.update { it.copy(crosshairOn = on) } }
-        if (settings.crosshairOn) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                CrosshairStyle.entries.forEach { st ->
-                    FxChip(st.label, settings.crosshairStyle == st) {
-                        OverlayController.update { it.copy(crosshairStyle = st) }
-                    }
-                }
-            }
-            Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                CrosshairColor.entries.forEach { c ->
-                    FxSwatch(Color(c.argb), c.label, settings.crosshairColor == c) {
-                        OverlayController.update { it.copy(crosshairColor = c) }
-                    }
-                }
-            }
-            Slider(
-                value = settings.crosshairSizeDp.toFloat(),
-                onValueChange = { v -> OverlayController.update { it.copy(crosshairSizeDp = v.roundToInt()) } },
-                valueRange = OverlaySettings.MIN_CROSSHAIR_DP.toFloat()..OverlaySettings.MAX_CROSSHAIR_DP.toFloat(),
-            )
+        Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(6.dp)) {
+            FxChip("Tools", tab == 0) { tab = 0 }
+            StatsTab(selected = tab == 1, health = health) { tab = 1 }
+            Spacer(Modifier.weight(1f))
+            FxChip("Stop", false, onStop)
         }
-
-        SectionDivider()
-
-        // ---- Screen filter
-        SwitchRow("Screen filter", settings.filterOn) { on -> OverlayController.update { it.copy(filterOn = on) } }
-        if (settings.filterOn) {
-            Row(horizontalArrangement = Arrangement.spacedBy(6.dp)) {
-                FilterMode.entries.forEach { m ->
-                    FxChip(m.label, settings.filterMode == m) {
-                        OverlayController.update { it.copy(filterMode = m) }
-                    }
-                }
+        Box(
+            Modifier
+                .weight(1f, fill = false)
+                .verticalScroll(rememberScrollState()),
+        ) {
+            Crossfade(targetState = tab, animationSpec = tween(140), label = "tab") { t ->
+                if (t == 0) ToolsPage(settings) else StatsPage(stats, health)
             }
-            Slider(
-                value = settings.filterStrength.toFloat(),
-                onValueChange = { v -> OverlayController.update { it.copy(filterStrength = v.roundToInt()) } },
-                valueRange = 0f..100f,
-            )
         }
+    }
+}
 
-        SectionDivider()
+/** The "Stats" tab chip with a small colour dot when the warning badge is active. */
+@Composable
+private fun StatsTab(selected: Boolean, health: Health, onClick: () -> Unit) {
+    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(4.dp)) {
+        FxChip("Stats", selected, onClick)
+        if (health.level != HealthLevel.OK) {
+            Box(Modifier.size(8.dp).clip(CircleShape).background(levelColor(health.level)))
+        }
+    }
+}
 
-        // ---- Live stats
-        Text("Live stats", color = FxColors.BlueSoft, fontWeight = FontWeight.SemiBold)
-        val s = stats
-        if (s == null) {
-            Text("Measuring…", color = FxColors.Muted)
-        } else {
-            val temp = s.batteryTempC
-            StatRow(
-                "Battery temp",
-                if (temp == null) "n/a" else "%.1f °C".format(java.util.Locale.US, temp),
-                when {
-                    temp == null -> FxColors.Muted
-                    temp >= 45f -> FxColors.Danger
-                    temp >= 40f -> FxColors.Warn
-                    else -> FxColors.Ok
-                },
-            )
-            StatRow(
+private fun levelColor(level: HealthLevel): Color = when (level) {
+    HealthLevel.OK -> FxColors.Ok
+    HealthLevel.WARN -> FxColors.Warn
+    HealthLevel.CRITICAL -> FxColors.Danger
+}
+
+@Composable
+private fun ToolsPage(s: OverlaySettings) {
+    val spring = spring<androidx.compose.ui.unit.IntSize>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+    Column(verticalArrangement = Arrangement.spacedBy(12.dp)) {
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolHeader(com.featherx.app.ui.Glyph.CROSSHAIR, "Crosshair", s.crosshairOn) { on ->
+                OverlayController.update { it.copy(crosshairOn = on) }
+            }
+            AnimatedVisibility(s.crosshairOn, enter = expandVertically(spring) + fadeIn(), exit = shrinkVertically(spring) + fadeOut()) {
+                CrosshairControls(s)
+            }
+        }
+        HairDivider()
+        Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+            ToolHeader(com.featherx.app.ui.Glyph.FILTER, "Screen filter", s.filterOn) { on ->
+                OverlayController.update { it.copy(filterOn = on) }
+            }
+            AnimatedVisibility(s.filterOn, enter = expandVertically(spring) + fadeIn(), exit = shrinkVertically(spring) + fadeOut()) {
+                FilterControls(s)
+            }
+        }
+        HairDivider()
+        StopwatchRow()
+        HairDivider()
+        MuteRow()
+        HairDivider()
+        ProfileRow()
+    }
+}
+
+@Composable
+private fun StatsPage(stats: StatsSnapshot?, health: Health) {
+    if (stats == null) {
+        Text("Measuring…", style = MaterialTheme.typography.bodySmall, color = FxColors.Muted)
+        return
+    }
+    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+        if (health.message != null) {
+            com.featherx.app.ui.StatusPill(health.message, levelColor(health.level))
+        }
+        val temp = stats.batteryTempC
+        val tempColor = when (HealthCheck.tempLevel(temp)) {
+            HealthLevel.OK -> if (temp == null) FxColors.Muted else FxColors.Ok
+            HealthLevel.WARN -> FxColors.Warn
+            HealthLevel.CRITICAL -> FxColors.Danger
+        }
+        val ramBad = HealthCheck.ramCritical(stats.ramFreeMb, stats.ramTotalMb, stats.lowMemory)
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile("Battery", temp?.let { String.format(Locale.US, "%.1f °C", it) } ?: "n/a", tempColor, Modifier.weight(1f))
+            StatTile(
                 "Free RAM",
-                "${SpeedCalc.formatMemory(s.ramFreeMb)} / ${SpeedCalc.formatMemory(s.ramTotalMb)}",
-                if (s.lowMemory) FxColors.Danger else FxColors.Text,
+                "${SpeedCalc.formatMemory(stats.ramFreeMb)} / ${SpeedCalc.formatMemory(stats.ramTotalMb)}",
+                if (ramBad) FxColors.Danger else FxColors.Text,
+                Modifier.weight(1f),
             )
-            StatRow(
-                "Ping (1.1.1.1)",
-                s.pingMs?.let { "$it ms" } ?: "no connection",
-                if (s.pingMs == null) FxColors.Danger else FxColors.Text,
-            )
-            StatRow("Download", SpeedCalc.format(s.downBytesPerSec), FxColors.Text)
-            StatRow("Upload", SpeedCalc.format(s.upBytesPerSec), FxColors.Text)
         }
-
-        SectionDivider()
-        Button(onClick = onStop, modifier = Modifier.fillMaxWidth()) { Text("Stop overlay") }
+        Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
+            StatTile(
+                "Ping",
+                stats.pingMs?.let { "$it ms" } ?: "offline",
+                if (stats.pingMs == null) FxColors.Danger else FxColors.Text,
+                Modifier.weight(1f),
+            )
+            StatTile(
+                "Speed",
+                "↓ ${SpeedCalc.format(stats.downBytesPerSec)}\n↑ ${SpeedCalc.format(stats.upBytesPerSec)}",
+                FxColors.Text,
+                Modifier.weight(1f),
+            )
+        }
     }
 }
 
-/** Solid, fully opaque: nothing from the app or game underneath can show through the panel. */
-private val PANEL_BACKGROUND = Color(0xFF0D1628)
-
 @Composable
-private fun SectionDivider() {
-    Box(
-        Modifier
-            .padding(vertical = 4.dp)
-            .fillMaxWidth()
-            .height(1.dp)
-            .background(FxColors.Blue.copy(alpha = 0.35f)),
-    )
-}
-
-@Composable
-private fun SwitchRow(label: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
+private fun StatTile(label: String, value: String, valueColor: Color, modifier: Modifier) {
+    val shape = RoundedCornerShape(12.dp)
+    Column(
+        modifier = modifier
+            .clip(shape)
+            .background(Color(0x0DFFFFFF))
+            .border(1.dp, FxColors.Border, shape)
+            .padding(10.dp),
+        verticalArrangement = Arrangement.spacedBy(2.dp),
     ) {
-        Text(label, color = FxColors.Text)
-        Switch(checked = checked, onCheckedChange = onChange)
-    }
-}
-
-@Composable
-private fun StatRow(name: String, value: String, valueColor: Color) {
-    Row(modifier = Modifier.fillMaxWidth(), horizontalArrangement = Arrangement.SpaceBetween) {
-        Text(name, color = FxColors.Muted, style = androidx.compose.material3.MaterialTheme.typography.bodySmall)
-        Text(value, color = valueColor, style = androidx.compose.material3.MaterialTheme.typography.labelLarge)
+        Text(label.uppercase(), style = MaterialTheme.typography.labelSmall, color = FxColors.Muted)
+        Text(value, style = MaterialTheme.typography.titleSmall, color = valueColor)
     }
 }

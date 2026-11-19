@@ -28,15 +28,10 @@ fun SettingsScreen() {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenHeader("Settings", "About this build")
+        ScreenHeader("Settings", "About")
 
         FxCard {
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    text = "App",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 InfoRow("Version", BuildConfig.VERSION_NAME)
                 InfoRow("Licence (original code)", "Apache-2.0")
                 InfoRow("Device", deviceName(Build.MANUFACTURER, Build.MODEL))
@@ -45,12 +40,7 @@ fun SettingsScreen() {
         }
 
         FxCard {
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    text = "Third-party",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
                 InfoRow("AndroidX / Jetpack Compose", "Apache-2.0")
             }
         }

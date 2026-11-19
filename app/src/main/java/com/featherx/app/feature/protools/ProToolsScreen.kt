@@ -9,6 +9,13 @@ import android.os.Build
 import android.provider.Settings
 import androidx.activity.compose.rememberLauncherForActivityResult
 import androidx.activity.result.contract.ActivityResultContracts
+import androidx.compose.animation.AnimatedVisibility
+import androidx.compose.animation.core.Spring
+import androidx.compose.animation.core.spring
+import androidx.compose.animation.expandVertically
+import androidx.compose.animation.fadeIn
+import androidx.compose.animation.fadeOut
+import androidx.compose.animation.shrinkVertically
 import androidx.compose.foundation.layout.Arrangement
 import androidx.compose.foundation.layout.Column
 import androidx.compose.foundation.layout.Row
@@ -17,27 +24,23 @@ import androidx.compose.foundation.layout.fillMaxWidth
 import androidx.compose.foundation.layout.padding
 import androidx.compose.foundation.rememberScrollState
 import androidx.compose.foundation.verticalScroll
-import androidx.compose.material3.Button
 import androidx.compose.material3.MaterialTheme
-import androidx.compose.material3.Slider
-import androidx.compose.material3.Switch
 import androidx.compose.material3.Text
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.ui.Alignment
 import androidx.compose.ui.Modifier
-import androidx.compose.ui.graphics.Color
 import androidx.compose.ui.platform.LocalContext
-import androidx.compose.ui.text.font.FontWeight
+import androidx.compose.ui.unit.IntSize
 import androidx.compose.ui.unit.dp
+import com.featherx.app.ui.FxButton
 import com.featherx.app.ui.FxCard
-import com.featherx.app.ui.FxChip
-import com.featherx.app.ui.FxSwatch
-import com.featherx.app.ui.InfoRow
+import com.featherx.app.ui.Glyph
 import com.featherx.app.ui.ScreenHeader
+import com.featherx.app.ui.SectionLabel
+import com.featherx.app.ui.StatusPill
 import com.featherx.app.ui.theme.FxColors
-import kotlin.math.roundToInt
 
 @Composable
 fun ProToolsScreen(vm: ProToolsViewModel) {
@@ -45,8 +48,8 @@ fun ProToolsScreen(vm: ProToolsViewModel) {
     val settings by OverlayController.settings.collectAsState()
     val running by OverlayController.running.collectAsState()
 
-    // Android 13+: ask for notification permission once so the "overlay is running" notice is visible.
-    // The overlay works either way; we start it after the answer.
+    // Android 13+: ask for notification permission once so the "running" notice is visible.
+    // The sidebar works either way; it is started after the answer.
     val notificationLauncher = rememberLauncherForActivityResult(
         ActivityResultContracts.RequestPermission(),
     ) { vm.startOverlay() }
@@ -66,6 +69,8 @@ fun ProToolsScreen(vm: ProToolsViewModel) {
         }
     }
 
+    val spring = spring<IntSize>(dampingRatio = Spring.DampingRatioNoBouncy, stiffness = Spring.StiffnessMediumLow)
+
     Column(
         modifier = Modifier
             .fillMaxSize()
@@ -73,147 +78,86 @@ fun ProToolsScreen(vm: ProToolsViewModel) {
             .padding(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        ScreenHeader("Pro Tools", "Floating sidebar for use over games")
+        ScreenHeader("Pro Tools", "In-game sidebar") {
+            StatusPill(if (running) "Running" else "Stopped", if (running) FxColors.Ok else FxColors.Muted)
+        }
 
-        // ---- Sidebar on/off
+        // ---- Sidebar
         FxCard {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                Text("Sidebar", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                InfoRow(
-                    "Display over other apps",
-                    if (vm.canDrawOverlays) "Allowed" else "Not allowed",
-                    if (vm.canDrawOverlays) FxColors.Ok else FxColors.Warn,
-                )
-                InfoRow("Sidebar", if (running) "Running" else "Stopped", if (running) FxColors.Ok else FxColors.Muted)
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(10.dp)) {
                 if (!vm.canDrawOverlays) {
-                    Text(
-                        "The sidebar is drawn on top of games, which Android only allows after you switch on " +
-                            "\"Display over other apps\" for FeatherX. Tap the button, switch it on, then come back.",
-                        style = MaterialTheme.typography.bodySmall,
-                        color = MaterialTheme.colorScheme.onSurfaceVariant,
-                    )
-                    Button(onClick = { openOverlaySettings() }, modifier = Modifier.fillMaxWidth()) {
-                        Text("Open permission settings")
+                    Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                        Column(Modifier.weight(1f)) {
+                            Text("Display over other apps", style = MaterialTheme.typography.titleSmall)
+                            Text("Required · currently off", style = MaterialTheme.typography.bodySmall, color = FxColors.Warn)
+                        }
+                        FxButton("Allow", onClick = { openOverlaySettings() })
                     }
                 } else if (running) {
-                    Button(onClick = { vm.stopOverlay() }, modifier = Modifier.fillMaxWidth()) { Text("Stop sidebar") }
+                    FxButton("Stop sidebar", onClick = { vm.stopOverlay() }, modifier = Modifier.fillMaxWidth(), filled = false)
                 } else {
-                    Button(onClick = { start() }, modifier = Modifier.fillMaxWidth()) { Text("Start sidebar") }
+                    FxButton("Start sidebar", onClick = { start() }, modifier = Modifier.fillMaxWidth())
                 }
                 Text(
-                    "After starting, a small blue handle sits on the right edge of the screen. Tap it to open " +
-                        "the tools, drag it up or down to move it. Everything below can also be changed from " +
-                        "the sidebar itself. Changes show on screen only while the sidebar is running.",
+                    "Handle on the right edge · tap to open · drag to move",
                     style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
+                    color = FxColors.Muted,
                 )
             }
         }
 
-        // ---- Crosshair
+        SectionLabel("Tools")
+
         FxCard {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ToggleHeader("Crosshair", settings.crosshairOn) { on ->
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ToolHeader(Glyph.CROSSHAIR, "Crosshair", settings.crosshairOn) { on ->
                     OverlayController.update { it.copy(crosshairOn = on) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    CrosshairStyle.entries.forEach { st ->
-                        FxChip(st.label, settings.crosshairStyle == st) {
-                            OverlayController.update { it.copy(crosshairStyle = st) }
-                        }
+                AnimatedVisibility(
+                    visible = settings.crosshairOn,
+                    enter = expandVertically(spring) + fadeIn(),
+                    exit = shrinkVertically(spring) + fadeOut(),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(10.dp)) {
+                        CrosshairControls(settings)
+                        Text(
+                            "Some online games ban crosshair overlays. Use at your own risk.",
+                            style = MaterialTheme.typography.bodySmall,
+                            color = FxColors.Warn,
+                        )
                     }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(10.dp), verticalAlignment = Alignment.CenterVertically) {
-                    CrosshairColor.entries.forEach { c ->
-                        FxSwatch(Color(c.argb), c.label, settings.crosshairColor == c) {
-                            OverlayController.update { it.copy(crosshairColor = c) }
-                        }
-                    }
-                }
-                Text("Size: ${settings.crosshairSizeDp} dp", style = MaterialTheme.typography.bodySmall, color = FxColors.Muted)
-                Slider(
-                    value = settings.crosshairSizeDp.toFloat(),
-                    onValueChange = { v -> OverlayController.update { it.copy(crosshairSizeDp = v.roundToInt()) } },
-                    valueRange = OverlaySettings.MIN_CROSSHAIR_DP.toFloat()..OverlaySettings.MAX_CROSSHAIR_DP.toFloat(),
-                )
-                Text(
-                    "Drawn at the exact centre of the screen. Touches pass through it to the game. " +
-                        "Fair play: some online games treat a crosshair overlay as unfair help and can ban " +
-                        "accounts. Check the game's rules and use it at your own risk.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = FxColors.Warn,
-                )
             }
         }
 
-        // ---- Screen filter
         FxCard {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(8.dp)) {
-                ToggleHeader("Screen filter", settings.filterOn) { on ->
+            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(12.dp)) {
+                ToolHeader(Glyph.FILTER, "Screen filter", settings.filterOn) { on ->
                     OverlayController.update { it.copy(filterOn = on) }
                 }
-                Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                    FilterMode.entries.forEach { m ->
-                        FxChip(m.label, settings.filterMode == m) {
-                            OverlayController.update { it.copy(filterMode = m) }
-                        }
+                AnimatedVisibility(
+                    visible = settings.filterOn,
+                    enter = expandVertically(spring) + fadeIn(),
+                    exit = shrinkVertically(spring) + fadeOut(),
+                ) {
+                    Column(verticalArrangement = Arrangement.spacedBy(8.dp)) {
+                        FilterControls(settings)
+                        Text(settings.filterMode.hint, style = MaterialTheme.typography.bodySmall, color = FxColors.Muted)
                     }
                 }
-                Text(settings.filterMode.hint, style = MaterialTheme.typography.bodySmall, color = FxColors.Muted)
-                Text("Strength: ${settings.filterStrength}%", style = MaterialTheme.typography.bodySmall, color = FxColors.Muted)
-                Slider(
-                    value = settings.filterStrength.toFloat(),
-                    onValueChange = { v -> OverlayController.update { it.copy(filterStrength = v.roundToInt()) } },
-                    valueRange = 0f..100f,
-                )
-                Text(
-                    "A filter can only be laid over the picture, so it cannot add real brightness. " +
-                        "\"Lift\" makes very dark areas easier to see by lowering contrast.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
             }
         }
 
-        // ---- Live stats
-        FxCard {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Live stats (inside the sidebar)", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Battery temperature comes from the battery sensor, not the CPU. " +
-                        "Free RAM comes from Android's memory info. " +
-                        "Ping is the time to open a connection to 1.1.1.1 (Cloudflare), not to your game server. " +
-                        "Speed is the total for the whole phone, all apps. " +
-                        "These are measured only while the sidebar panel is open, every 2 seconds.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
-            }
-        }
+        SectionLabel("Gaming")
 
-        // ---- Not built
-        FxCard {
-            Column(Modifier.padding(16.dp), verticalArrangement = Arrangement.spacedBy(6.dp)) {
-                Text("Screen magnifier", style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-                Text(
-                    "Not built yet. Zooming another app's screen needs Android's screen-capture permission " +
-                        "(a system prompt each time) and some games block capture. It will be the next separate step.",
-                    style = MaterialTheme.typography.bodySmall,
-                    color = FxColors.Warn,
-                )
-            }
-        }
-    }
-}
+        FxCard { Column(Modifier.padding(16.dp)) { ProfileRow() } }
+        FxCard { Column(Modifier.padding(16.dp)) { MuteRow() } }
 
-@Composable
-private fun ToggleHeader(title: String, checked: Boolean, onChange: (Boolean) -> Unit) {
-    Row(
-        modifier = Modifier.fillMaxWidth(),
-        horizontalArrangement = Arrangement.SpaceBetween,
-        verticalAlignment = Alignment.CenterVertically,
-    ) {
-        Text(title, style = MaterialTheme.typography.titleMedium, fontWeight = FontWeight.SemiBold)
-        Switch(checked = checked, onCheckedChange = onChange)
+        Text(
+            "Stopwatch and live stats are inside the sidebar.",
+            modifier = Modifier.padding(horizontal = 4.dp),
+            style = MaterialTheme.typography.bodySmall,
+            color = FxColors.Muted,
+        )
     }
 }

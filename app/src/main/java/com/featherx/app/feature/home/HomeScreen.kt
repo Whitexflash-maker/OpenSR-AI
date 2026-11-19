@@ -17,7 +17,10 @@ import androidx.compose.ui.text.font.FontWeight
 import androidx.compose.ui.text.withStyle
 import androidx.compose.ui.unit.dp
 import com.featherx.app.BuildConfig
+import androidx.compose.foundation.layout.Row
 import com.featherx.app.ui.FxCard
+import com.featherx.app.ui.FxChip
+import com.featherx.app.ui.SectionLabel
 import com.featherx.app.ui.InfoRow
 import com.featherx.app.ui.theme.FxColors
 
@@ -33,52 +36,36 @@ fun HomeScreen() {
         Text(
             text = buildAnnotatedString {
                 append("Feather")
-                withStyle(SpanStyle(color = FxColors.Blue)) { append("X") }
+                withStyle(SpanStyle(color = FxColors.Cyan)) { append("X") }
             },
             style = MaterialTheme.typography.displaySmall.copy(
-                shadow = Shadow(color = FxColors.Blue.copy(alpha = 0.55f), blurRadius = 28f),
+                shadow = Shadow(color = FxColors.Cyan.copy(alpha = 0.5f), blurRadius = 32f),
             ),
             fontWeight = FontWeight.Bold,
             color = MaterialTheme.colorScheme.onBackground,
         )
         Text(
             text = "Lightweight. Intelligent. Powerful.",
-            style = MaterialTheme.typography.bodyLarge,
+            style = MaterialTheme.typography.bodyMedium,
             color = MaterialTheme.colorScheme.onSurfaceVariant,
         )
 
+        SectionLabel("Status")
         FxCard {
-            Column(Modifier.padding(16.dp)) {
-                Text(
-                    text = "Feature status · v${BuildConfig.VERSION_NAME}",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                InfoRow("Pro Tools overlay (Step 5b)", "Built, needs testing on phone", FxColors.BlueSoft)
-                InfoRow("Game Space", "Basic version (Step 5)", FxColors.BlueSoft)
-                InfoRow("Performance modes", "Not built (Step 6)", FxColors.Warn)
-                InfoRow("Device monitor", "Not built (Step 7)", FxColors.Warn)
-                InfoRow("Thermal & memory safety", "Not built (Step 8)", FxColors.Warn)
+            Column(Modifier.padding(horizontal = 16.dp, vertical = 8.dp)) {
+                InfoRow("Games", "Ready", FxColors.Ok)
+                InfoRow("Pro Tools sidebar", "Beta", FxColors.Cyan)
+                InfoRow("Performance modes", "Planned", FxColors.Muted)
+                InfoRow("Thermal & RAM guard", "Badge in sidebar", FxColors.Cyan)
             }
         }
 
         FxCard {
-            Column(
+            Row(
                 modifier = Modifier.padding(16.dp),
-                verticalArrangement = Arrangement.spacedBy(6.dp),
+                horizontalArrangement = Arrangement.spacedBy(8.dp),
             ) {
-                Text(
-                    text = "Principles",
-                    style = MaterialTheme.typography.titleMedium,
-                    fontWeight = FontWeight.SemiBold,
-                )
-                Text(
-                    text = "Only public Android APIs. No changes to other apps or games, " +
-                        "no clock-speed or thermal overrides, no FPS promises. " +
-                        "A metric that cannot be measured is shown as unavailable, never invented.",
-                    style = MaterialTheme.typography.bodyMedium,
-                    color = MaterialTheme.colorScheme.onSurfaceVariant,
-                )
+                listOf("Public APIs only", "No root", "No FPS claims").forEach { FxChip(it, false) {} }
             }
         }
     }

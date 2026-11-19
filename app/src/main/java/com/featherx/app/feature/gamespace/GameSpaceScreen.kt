@@ -30,6 +30,7 @@ import androidx.compose.material3.Text
 import androidx.compose.material3.TextButton
 import androidx.compose.runtime.Composable
 import androidx.compose.runtime.LaunchedEffect
+import androidx.compose.runtime.collectAsState
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.produceState
@@ -44,7 +45,10 @@ import androidx.compose.ui.text.style.TextAlign
 import androidx.compose.ui.text.style.TextOverflow
 import androidx.compose.ui.unit.Dp
 import androidx.compose.ui.unit.dp
+import com.featherx.app.feature.protools.OverlayController
+import com.featherx.app.ui.FxButton
 import com.featherx.app.ui.FxCard
+import com.featherx.app.ui.SectionLabel
 import com.featherx.app.ui.ScreenHeader
 import com.featherx.app.ui.theme.FxColors
 
@@ -60,12 +64,12 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
         contentPadding = PaddingValues(16.dp),
         verticalArrangement = Arrangement.spacedBy(12.dp),
     ) {
-        item { ScreenHeader("Game Space", "Your game library") }
+        item { ScreenHeader("Games", "Library · ${vm.library.size}") }
 
         item {
             Row(horizontalArrangement = Arrangement.spacedBy(8.dp)) {
-                Button(onClick = { showAddDialog = true }) { Text("Add game") }
-                OutlinedButton(onClick = { vm.refresh() }, enabled = !vm.loading) { Text("Refresh") }
+                FxButton("Add game", onClick = { showAddDialog = true })
+                FxButton("Refresh", onClick = { if (!vm.loading) vm.refresh() }, filled = false)
             }
         }
 
@@ -78,13 +82,7 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
         }
 
         if (vm.recents.isNotEmpty()) {
-            item {
-                Text(
-                    text = "Recently launched from FeatherX",
-                    style = MaterialTheme.typography.titleSmall,
-                    fontWeight = FontWeight.SemiBold,
-                )
-            }
+            item { SectionLabel("Recent") }
             item {
                 LazyRow(horizontalArrangement = Arrangement.spacedBy(12.dp)) {
                     items(vm.recents, key = { it.packageName }) { app ->
@@ -94,21 +92,13 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
             }
         }
 
-        item {
-            Text(
-                text = "Library (${vm.library.size})",
-                style = MaterialTheme.typography.titleSmall,
-                fontWeight = FontWeight.SemiBold,
-            )
-        }
+        item { SectionLabel("Library") }
 
         if (vm.library.isEmpty() && !vm.loading) {
             item {
                 FxCard {
                     Text(
-                        text = "No games yet. Android only marks an app as a game if the app " +
-                            "declares it, so many games are not found automatically. " +
-                            "Tap \"Add game\" and pick yours from the list.",
+                        text = "No games found. Tap Add game and pick yours.",
                         modifier = Modifier.padding(16.dp),
                         style = MaterialTheme.typography.bodyMedium,
                         color = MaterialTheme.colorScheme.onSurfaceVariant,
@@ -130,9 +120,7 @@ fun GameSpaceScreen(vm: GameSpaceViewModel) {
 
         item {
             Text(
-                text = "FeatherX reads only the names, icons and game category of apps that have a " +
-                    "launcher icon. Nothing leaves your phone. Launching a game opens it normally; " +
-                    "FeatherX does not change how the game runs.",
+                text = "Reads app names and icons only. Nothing leaves your phone.",
                 style = MaterialTheme.typography.bodySmall,
                 color = MaterialTheme.colorScheme.onSurfaceVariant,
             )
@@ -173,10 +161,12 @@ private fun LibraryRow(
                 maxLines = 1,
                 overflow = TextOverflow.Ellipsis,
             )
+            val profiled by OverlayController.profiled.collectAsState()
+            val hasProfile = entry.app.packageName in profiled
             Text(
-                text = if (entry.addedByUser) "Added by you" else "Detected as a game by Android",
+                text = if (hasProfile) "Profile saved" else if (entry.addedByUser) "Added by you" else "Detected",
                 style = MaterialTheme.typography.labelSmall,
-                color = MaterialTheme.colorScheme.onSurfaceVariant,
+                color = if (hasProfile) FxColors.Cyan else MaterialTheme.colorScheme.onSurfaceVariant,
             )
         }
         TextButton(onClick = onRemove) { Text("Remove") }

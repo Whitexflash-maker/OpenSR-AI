@@ -40,4 +40,25 @@ class OverlaySettingsTest {
         assertEquals(CrosshairStyle.DOT, enumOrDefault("NOPE", CrosshairStyle.DOT))
         assertEquals(FilterMode.WARM, enumOrDefault(null, FilterMode.WARM))
     }
+
+    @Test
+    fun encodeDecodeRoundTrip() {
+        val original = OverlaySettings(
+            crosshairOn = true, crosshairStyle = CrosshairStyle.CIRCLE, crosshairColor = CrosshairColor.CYAN,
+            crosshairSizeDp = 31, crosshairOffsetXDp = -12, crosshairOffsetYDp = 7,
+            filterOn = true, filterMode = FilterMode.WARM, filterStrength = 64,
+        )
+        assertEquals(original, OverlaySettings.decode(original.encode()))
+    }
+
+    @Test
+    fun decodeHandlesBlankBrokenAndOutOfRange() {
+        assertEquals(null, OverlaySettings.decode(null))
+        assertEquals(null, OverlaySettings.decode("  "))
+        val d = OverlaySettings.decode("co=true&sz=abc&ox=999&zzz&fm=NOPE")!!
+        assertEquals(true, d.crosshairOn)
+        assertEquals(OverlaySettings.DEFAULT_CROSSHAIR_DP, d.crosshairSizeDp)
+        assertEquals(OverlaySettings.MAX_OFFSET_DP, d.crosshairOffsetXDp)
+        assertEquals(FilterMode.LIFT, d.filterMode)
+    }
 }

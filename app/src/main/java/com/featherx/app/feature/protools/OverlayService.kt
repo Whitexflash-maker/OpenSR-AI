@@ -19,6 +19,7 @@ import android.view.WindowManager
 import androidx.compose.runtime.getValue
 import androidx.compose.runtime.mutableStateOf
 import androidx.compose.runtime.setValue
+import androidx.compose.runtime.snapshotFlow
 import androidx.compose.ui.platform.ComposeView
 import androidx.lifecycle.setViewTreeLifecycleOwner
 import androidx.lifecycle.setViewTreeViewModelStoreOwner
@@ -51,6 +52,7 @@ class OverlayService : Service() {
     private var sidebarView: ComposeView? = null
     private var sidebarParams: WindowManager.LayoutParams? = null
     private var expanded by mutableStateOf(false)
+    private var frosted = false
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -76,6 +78,8 @@ class OverlayService : Service() {
             addSidebar()
             started = true
             OverlayController.setRunning(true)
+            // Blur only while the panel is open, so the closed handle never blurs a strip of the game.
+            scope.launch { snapshotFlow { expanded }.collect { applySidebarBlur(it) } }
             scope.launch {
                 OverlayController.settings.collect { s ->
                     applyCrosshair(s)
@@ -131,6 +135,8 @@ class OverlayService : Service() {
             y = resources.displayMetrics.heightPixels / 3
         }
         val sampler = StatsSampler(this)
+        // Real blur behind the panel (public API, Android 12+, only where the device supports it).
+        frosted = Build.VERSION.SDK_INT >= 31 && wm.isCrossWindowBlurEnabled
         val view = ComposeView(this).apply {
             setViewTreeLifecycleOwner(owner)
             setViewTreeSavedStateRegistryOwner(owner)
@@ -144,6 +150,7 @@ class OverlayService : Service() {
                         onMoveTo = { y -> moveSidebarTo(y) },
                         onStop = { stopSelf() },
                         sampler = sampler,
+                        frosted = frosted,
                     )
                 }
             }
@@ -151,6 +158,16 @@ class OverlayService : Service() {
         sidebarParams = params
         sidebarView = view
         wm.addView(view, params)
+    }
+
+    private fun applySidebarBlur(open: Boolean) {
+        if (!frosted || Build.VERSION.SDK_INT < 31) return
+        val view = sidebarView ?: return
+        val params = sidebarParams ?: return
+        params.blurBehindRadius = if (open) BLUR_RADIUS_PX else 0
+        params.flags = if (open) params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
+        else params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
+        try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
     }
 
     private fun moveSidebarTo(y: Float) {
@@ -176,6 +193,8 @@ class OverlayService : Service() {
         // Its own window, centred on the screen, never takes focus or touches.
         val params = baseParams(sizePx, sizePx, passThroughFlags).apply {
             gravity = Gravity.CENTER
+            x = offsetPx(s.crosshairOffsetXDp)
+            y = offsetPx(s.crosshairOffsetYDp)
             alpha = MAX_UNTRUSTED_ALPHA
             applyCutoutMode(this)
         }
@@ -202,7 +221,9 @@ class OverlayService : Service() {
         filterView = view
     }
 
-    private fun crosshairPx(s: OverlaySettings) = (s.crosshairSizeDp * resources.displayMetrics.density).toInt()
+    private fun crosshairPx(s: OverlaySettings) = offsetPx(s.crosshairSizeDp)
+
+    private fun offsetPx(dp: Int) = (dp * resources.displayMetrics.density).toInt()
 
     private fun applyCrosshair(s: OverlaySettings) {
         val view = crosshairView ?: return
@@ -211,9 +232,13 @@ class OverlayService : Service() {
         view.visibility = if (s.crosshairOn) View.VISIBLE else View.GONE
         val params = view.layoutParams as? WindowManager.LayoutParams ?: return
         val sizePx = crosshairPx(s)
-        if (params.width != sizePx) {
+        val x = offsetPx(s.crosshairOffsetXDp)
+        val y = offsetPx(s.crosshairOffsetYDp)
+        if (params.width != sizePx || params.x != x || params.y != y) {
             params.width = sizePx
             params.height = sizePx
+            params.x = x
+            params.y = y
             try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
         }
     }
@@ -282,5 +307,6 @@ class OverlayService : Service() {
 
         /** Android 12+ blocks touches that pass through an overlay more opaque than 0.8. */
         private const val MAX_UNTRUSTED_ALPHA = 0.8f
+        private const val BLUR_RADIUS_PX = 28
     }
 }
