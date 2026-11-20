@@ -98,8 +98,16 @@ fun ProToolsScreen(vm: ProToolsViewModel) {
                 } else {
                     FxButton("Start sidebar", onClick = { start() }, modifier = Modifier.fillMaxWidth())
                 }
+                val linked by OverlayController.linkWings.collectAsState()
+                Row(verticalAlignment = Alignment.CenterVertically, horizontalArrangement = Arrangement.spacedBy(12.dp)) {
+                    Column(Modifier.weight(1f)) {
+                        Text("Open both wings together", style = MaterialTheme.typography.titleSmall)
+                        Text("Tap or swipe one edge, both open", style = MaterialTheme.typography.bodySmall, color = FxColors.Muted)
+                    }
+                    com.featherx.app.ui.FxSwitch(linked) { OverlayController.setLinkWings(it) }
+                }
                 Text(
-                    "Handle on the right edge · tap to open · drag to move",
+                    "Edge tabs on both sides · tap or swipe in · long-press opens both",
                     style = MaterialTheme.typography.bodySmall,
                     color = FxColors.Muted,
                 )

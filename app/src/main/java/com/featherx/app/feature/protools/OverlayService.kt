@@ -31,11 +31,12 @@ import kotlinx.coroutines.CoroutineScope
 import kotlinx.coroutines.Dispatchers
 import kotlinx.coroutines.SupervisorJob
 import kotlinx.coroutines.cancel
+import kotlinx.coroutines.delay
 import kotlinx.coroutines.launch
 
 /**
  * Foreground service that owns three overlay windows (needs the "Display over other apps" permission):
- *  1. two edge sidebars, LEFT (Monitor) and RIGHT (Tools): handle + panel, touchable, tiny when closed
+ *  1. two edge wings, LEFT (Monitor) and RIGHT (Tools): a thin trigger strip when closed, a full-height wing when open
  *  2. crosshair, centred, NOT touchable (touches pass through to the game)
  *  3. screen filter, full screen, NOT touchable
  * Windows 2 and 3 are created first (so the sidebar stays on top) and are hidden while their switch is off.
@@ -55,7 +56,9 @@ class OverlayService : Service() {
     private inner class Sidebar(val side: SidebarSide) {
         var view: ComposeView? = null
         var params: WindowManager.LayoutParams? = null
-        var expanded by mutableStateOf(false)
+        var expanded by mutableStateOf(false)   // wing open (or sliding out)
+        var docked by mutableStateOf(true)       // window is the thin trigger strip
+        var triggerY = 0                          // where the trigger sits while closed
     }
 
     private val leftBar = Sidebar(SidebarSide.LEFT)
@@ -133,6 +136,7 @@ class OverlayService : Service() {
 
     private fun addSidebar(bar: Sidebar) {
         val left = bar.side == SidebarSide.LEFT
+        bar.triggerY = resources.displayMetrics.heightPixels / 3
         val params = baseParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -142,12 +146,11 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         ).apply {
             gravity = Gravity.TOP or (if (left) Gravity.START else Gravity.END)
-            x = 0
-            y = resources.displayMetrics.heightPixels / 3
-            applyCutoutMode(this) // handles stay reachable beside the camera cut-out in landscape
+            x = 0 // flush against the extreme screen edge
+            y = bar.triggerY
         }
         val sampler = StatsSampler(this)
-        // Real blur behind the panel (public API, Android 12+, only where the device supports it).
+        // Real blur behind an open wing (public API, Android 12+, only where the device supports it).
         frosted = Build.VERSION.SDK_INT >= 31 && wm.isCrossWindowBlurEnabled
         val view = ComposeView(this).apply {
             setViewTreeLifecycleOwner(owner)
@@ -158,7 +161,10 @@ class OverlayService : Service() {
                     SidebarOverlay(
                         side = bar.side,
                         expanded = bar.expanded,
-                        onToggle = { bar.expanded = !bar.expanded },
+                        docked = bar.docked,
+                        onToggle = { toggleBar(bar) },
+                        onOpenBoth = { toggleBoth() },
+                        onClose = { closeBar(bar) },
                         currentY = { bar.params?.y?.toFloat() ?: 0f },
                         onMoveTo = { y -> moveSidebarTo(bar, y) },
                         onStop = { stopSelf() },
@@ -173,6 +179,59 @@ class OverlayService : Service() {
         wm.addView(view, params)
     }
 
+    /**
+     * Open: the window grows to full height at once and the wing slides in.
+     * Close: the wing slides out first, then the window shrinks back to the thin trigger strip.
+     */
+    private fun setOpen(bar: Sidebar, open: Boolean) {
+        if (bar.expanded == open) return
+        bar.expanded = open
+        val view = bar.view ?: return
+        val params = bar.params ?: return
+        if (open) {
+            bar.docked = false
+            params.height = WindowManager.LayoutParams.MATCH_PARENT
+            params.y = 0
+            try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
+        } else {
+            scope.launch {
+                delay(CLOSE_ANIMATION_MS)
+                if (!bar.expanded) {
+                    params.height = WindowManager.LayoutParams.WRAP_CONTENT
+                    params.y = bar.triggerY
+                    try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
+                    bar.docked = true
+                }
+            }
+        }
+    }
+
+    private fun toggleBar(bar: Sidebar) {
+        val open = !bar.expanded
+        if (OverlayController.linkWings.value) {
+            setOpen(leftBar, open)
+            setOpen(rightBar, open)
+        } else {
+            setOpen(bar, open)
+        }
+    }
+
+    private fun closeBar(bar: Sidebar) {
+        if (OverlayController.linkWings.value) {
+            setOpen(leftBar, false)
+            setOpen(rightBar, false)
+        } else {
+            setOpen(bar, false)
+        }
+    }
+
+    /** Long-press on a trigger: both wings open together (or both close if both are already open). */
+    private fun toggleBoth() {
+        val open = !(leftBar.expanded && rightBar.expanded)
+        setOpen(leftBar, open)
+        setOpen(rightBar, open)
+    }
+
     private fun applySidebarBlur(bar: Sidebar, open: Boolean) {
         if (!frosted || Build.VERSION.SDK_INT < 31) return
         val view = bar.view ?: return
@@ -183,11 +242,14 @@ class OverlayService : Service() {
         try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
     }
 
+    /** Only the thin trigger can be moved (an open wing is full height). */
     private fun moveSidebarTo(bar: Sidebar, y: Float) {
+        if (!bar.docked) return
         val view = bar.view ?: return
         val params = bar.params ?: return
         val maxY = (resources.displayMetrics.heightPixels - view.height).coerceAtLeast(0)
         params.y = y.toInt().coerceIn(0, maxY)
+        bar.triggerY = params.y
         try {
             wm.updateViewLayout(view, params)
         } catch (e: IllegalArgumentException) {
@@ -321,5 +383,6 @@ class OverlayService : Service() {
         /** Android 12+ blocks touches that pass through an overlay more opaque than 0.8. */
         private const val MAX_UNTRUSTED_ALPHA = 0.8f
         private const val BLUR_RADIUS_PX = 28
+        private const val CLOSE_ANIMATION_MS = 280L
     }
 }

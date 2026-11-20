@@ -31,6 +31,10 @@ object OverlayController {
     private val _profiled = MutableStateFlow<Set<String>>(emptySet())
     val profiled: StateFlow<Set<String>> = _profiled.asStateFlow()
 
+    /** When on, opening or closing one wing opens or closes both (RedMagic-style symmetric HUD). */
+    private val _linkWings = MutableStateFlow(false)
+    val linkWings: StateFlow<Boolean> = _linkWings.asStateFlow()
+
     val stopwatch = Stopwatch()
 
     private var prefs: SharedPreferences? = null
@@ -45,6 +49,7 @@ object OverlayController {
         prefs = p
         profilePrefs = pp
         _settings.value = OverlaySettings.decode(p.getString("settings", null)) ?: OverlaySettings()
+        _linkWings.value = p.getBoolean("linkWings", false)
         val pkg = p.getString("activePkg", null)
         val label = p.getString("activeLabel", null)
         if (pkg != null && label != null) _activeGame.value = ActiveGame(pkg, label)
@@ -55,6 +60,11 @@ object OverlayController {
         val next = transform(_settings.value).sanitized()
         _settings.value = next
         prefs?.edit()?.putString("settings", next.encode())?.apply()
+    }
+
+    fun setLinkWings(value: Boolean) {
+        _linkWings.value = value
+        prefs?.edit()?.putBoolean("linkWings", value)?.apply()
     }
 
     fun setRunning(value: Boolean) {
