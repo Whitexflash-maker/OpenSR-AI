@@ -54,7 +54,6 @@ import androidx.compose.ui.platform.LocalHapticFeedback
 import androidx.compose.ui.unit.dp
 import com.featherx.app.ui.FxChip
 import com.featherx.app.ui.FxGlyph
-import com.featherx.app.ui.Glyph
 import com.featherx.app.ui.FxRoundToggle
 import com.featherx.app.ui.Glyph
 import com.featherx.app.ui.HairDivider
