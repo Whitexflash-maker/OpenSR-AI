@@ -35,7 +35,7 @@ import kotlinx.coroutines.launch
 
 /**
  * Foreground service that owns three overlay windows (needs the "Display over other apps" permission):
- *  1. sidebar (handle + panel), touchable, tiny when closed
+ *  1. two edge sidebars, LEFT (Monitor) and RIGHT (Tools): handle + panel, touchable, tiny when closed
  *  2. crosshair, centred, NOT touchable (touches pass through to the game)
  *  3. screen filter, full screen, NOT touchable
  * Windows 2 and 3 are created first (so the sidebar stays on top) and are hidden while their switch is off.
@@ -49,10 +49,17 @@ class OverlayService : Service() {
 
     private var crosshairView: CrosshairView? = null
     private var filterView: View? = null
-    private var sidebarView: ComposeView? = null
-    private var sidebarParams: WindowManager.LayoutParams? = null
-    private var expanded by mutableStateOf(false)
     private var frosted = false
+
+    /** One edge sidebar window (its own ComposeView, position and open/closed state). */
+    private inner class Sidebar(val side: SidebarSide) {
+        var view: ComposeView? = null
+        var params: WindowManager.LayoutParams? = null
+        var expanded by mutableStateOf(false)
+    }
+
+    private val leftBar = Sidebar(SidebarSide.LEFT)
+    private val rightBar = Sidebar(SidebarSide.RIGHT)
 
     override fun onBind(intent: Intent?): IBinder? = null
 
@@ -75,11 +82,13 @@ class OverlayService : Service() {
             // the crosshair can never be drawn over the panel.
             addCrosshairWindow()
             addFilterWindow()
-            addSidebar()
+            addSidebar(leftBar)
+            addSidebar(rightBar)
             started = true
             OverlayController.setRunning(true)
             // Blur only while the panel is open, so the closed handle never blurs a strip of the game.
-            scope.launch { snapshotFlow { expanded }.collect { applySidebarBlur(it) } }
+            scope.launch { snapshotFlow { leftBar.expanded }.collect { applySidebarBlur(leftBar, it) } }
+            scope.launch { snapshotFlow { rightBar.expanded }.collect { applySidebarBlur(rightBar, it) } }
             scope.launch {
                 OverlayController.settings.collect { s ->
                     applyCrosshair(s)
@@ -100,7 +109,8 @@ class OverlayService : Service() {
         scope.cancel()
         removeSafely(crosshairView); crosshairView = null
         removeSafely(filterView); filterView = null
-        removeSafely(sidebarView); sidebarView = null
+        removeSafely(leftBar.view); leftBar.view = null
+        removeSafely(rightBar.view); rightBar.view = null
         if (started) owner.stop()
         OverlayController.setRunning(false)
         super.onDestroy()
@@ -121,7 +131,8 @@ class OverlayService : Service() {
             WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
             WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS
 
-    private fun addSidebar() {
+    private fun addSidebar(bar: Sidebar) {
+        val left = bar.side == SidebarSide.LEFT
         val params = baseParams(
             WindowManager.LayoutParams.WRAP_CONTENT,
             WindowManager.LayoutParams.WRAP_CONTENT,
@@ -130,9 +141,10 @@ class OverlayService : Service() {
                 WindowManager.LayoutParams.FLAG_LAYOUT_IN_SCREEN or
                 WindowManager.LayoutParams.FLAG_LAYOUT_NO_LIMITS,
         ).apply {
-            gravity = Gravity.TOP or Gravity.END
+            gravity = Gravity.TOP or (if (left) Gravity.START else Gravity.END)
             x = 0
             y = resources.displayMetrics.heightPixels / 3
+            applyCutoutMode(this) // handles stay reachable beside the camera cut-out in landscape
         }
         val sampler = StatsSampler(this)
         // Real blur behind the panel (public API, Android 12+, only where the device supports it).
@@ -144,10 +156,11 @@ class OverlayService : Service() {
             setContent {
                 FeatherXTheme {
                     SidebarOverlay(
-                        expanded = expanded,
-                        onToggle = { expanded = !expanded },
-                        currentY = { sidebarParams?.y?.toFloat() ?: 0f },
-                        onMoveTo = { y -> moveSidebarTo(y) },
+                        side = bar.side,
+                        expanded = bar.expanded,
+                        onToggle = { bar.expanded = !bar.expanded },
+                        currentY = { bar.params?.y?.toFloat() ?: 0f },
+                        onMoveTo = { y -> moveSidebarTo(bar, y) },
                         onStop = { stopSelf() },
                         sampler = sampler,
                         frosted = frosted,
@@ -155,24 +168,24 @@ class OverlayService : Service() {
                 }
             }
         }
-        sidebarParams = params
-        sidebarView = view
+        bar.params = params
+        bar.view = view
         wm.addView(view, params)
     }
 
-    private fun applySidebarBlur(open: Boolean) {
+    private fun applySidebarBlur(bar: Sidebar, open: Boolean) {
         if (!frosted || Build.VERSION.SDK_INT < 31) return
-        val view = sidebarView ?: return
-        val params = sidebarParams ?: return
+        val view = bar.view ?: return
+        val params = bar.params ?: return
         params.blurBehindRadius = if (open) BLUR_RADIUS_PX else 0
         params.flags = if (open) params.flags or WindowManager.LayoutParams.FLAG_BLUR_BEHIND
         else params.flags and WindowManager.LayoutParams.FLAG_BLUR_BEHIND.inv()
         try { wm.updateViewLayout(view, params) } catch (e: IllegalArgumentException) { }
     }
 
-    private fun moveSidebarTo(y: Float) {
-        val view = sidebarView ?: return
-        val params = sidebarParams ?: return
+    private fun moveSidebarTo(bar: Sidebar, y: Float) {
+        val view = bar.view ?: return
+        val params = bar.params ?: return
         val maxY = (resources.displayMetrics.heightPixels - view.height).coerceAtLeast(0)
         params.y = y.toInt().coerceIn(0, maxY)
         try {
