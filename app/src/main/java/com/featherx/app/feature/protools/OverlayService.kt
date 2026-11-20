@@ -174,6 +174,15 @@ class OverlayService : Service() {
                 }
             }
         }
+        // While only the thin trigger is showing, ask Android not to treat a swipe from this edge as the Back
+        // gesture (Android 10+, and limited to about 200 dp of height per edge, so never for an open wing).
+        if (Build.VERSION.SDK_INT >= 29) {
+            view.addOnLayoutChangeListener { v, l, t, r, b, _, _, _, _ ->
+                val small = (b - t) <= 200 * resources.displayMetrics.density
+                v.systemGestureExclusionRects =
+                    if (small) listOf(android.graphics.Rect(0, 0, r - l, b - t)) else emptyList()
+            }
+        }
         bar.params = params
         bar.view = view
         wm.addView(view, params)
